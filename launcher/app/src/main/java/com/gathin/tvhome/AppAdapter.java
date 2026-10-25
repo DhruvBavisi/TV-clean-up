@@ -523,13 +523,13 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         h.banner.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int wDp, hDp;
         if ("app.netmirror.newtv".equals(e.pkg)) {
-            wDp = 40; hDp = 68;
+            wDp = 34; hDp = 58;
         } else if ("com.amazon.amazonvideo.livingroom".equals(e.pkg)) {
             wDp = 108; hDp = 52;
         } else if ("in.startv.hotstar".equals(e.pkg)) {
             wDp = 70; hDp = 63;
         } else if ("com.google.android.youtube.tv".equals(e.pkg)) {
-            wDp = 70; hDp = 49;
+            wDp = 60; hDp = 42;
         } else if ("com.sonyliv".equals(e.pkg)) {
             wDp = 84; hDp = 46;
         } else { // PS5
