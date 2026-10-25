@@ -378,9 +378,8 @@
 
                 <LinearLayout
                     android:id="@+id/wifiBlock"
-                    android:layout_width="wrap_content"
+                    android:layout_width="56dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
                     android:orientation="vertical"
                     android:gravity="center_horizontal"
                     android:clipChildren="false"
@@ -397,12 +396,13 @@
 
                     <TextView
                         android:id="@+id/wifiName"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:textAlignment="center"
                         android:singleLine="true"
                         android:ellipsize="end"
-                        android:maxWidth="140dp"
                         android:textColor="#CCFFFFFF"
                         android:textSize="11sp"
                         android:fontFamily="@font/outfit_regular"
@@ -413,6 +413,7 @@
                 <TextView
                     android:id="@+id/btnInputs"
                     style="@style/TopButton"
+                    android:layout_marginStart="0dp"
                     android:contentDescription="@string/inputs"
                     android:drawableStart="@drawable/ic_top_input"
                     android:nextFocusLeft="@+id/btnWifi"
@@ -422,6 +423,7 @@
                 <TextView
                     android:id="@+id/btnSettings"
                     style="@style/TopButton"
+                    android:layout_marginStart="10dp"
                     android:contentDescription="@string/settings"
                     android:drawableStart="@drawable/ic_settings"
                     android:nextFocusLeft="@+id/btnInputs"

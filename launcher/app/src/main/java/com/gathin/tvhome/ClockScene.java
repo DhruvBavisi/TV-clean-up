@@ -12,8 +12,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.view.View;
+import android.widget.TextView;
 
 import java.io.File;
 import java.util.Random;
@@ -36,6 +38,9 @@ final class ClockScene {
     private final Random random = new Random();
     private final View content;
     private final View ambient;
+    private final View timeRow;
+    private final TextView dreamClock;
+    private final TextView dreamDate;
     private final GradientDrawable glow;
     private int colorIndex;
     private int glowColor;
@@ -53,6 +58,7 @@ final class ClockScene {
         public void run() {
             moveClock();
             shiftGlow();
+            handler.post(ClockScene.this::adjustDateLetterSpacing);
             handler.postDelayed(this, MOVE_MS);
         }
     };
@@ -61,19 +67,78 @@ final class ClockScene {
     ClockScene(View root) {
         content = root.findViewById(R.id.dreamContent);
         ambient = root.findViewById(R.id.dreamAmbient);
+        timeRow = root.findViewById(R.id.dreamTimeRow);
+        dreamClock = root.findViewById(R.id.dreamClock);
+        dreamDate = root.findViewById(R.id.dreamDate);
         glow = new GradientDrawable();
         glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
         ambient.setBackground(glow);
         ambient.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) ->
                 glow.setGradientRadius((r - l) * 0.55f));
+        View.OnLayoutChangeListener layoutListener = (v, l, t, r, b, ol, ot, or, ob) -> adjustDateLetterSpacing();
+        if (timeRow != null) timeRow.addOnLayoutChangeListener(layoutListener);
+        if (dreamClock != null) dreamClock.addOnLayoutChangeListener(layoutListener);
+        if (dreamDate != null) dreamDate.addOnLayoutChangeListener(layoutListener);
         colorIndex = random.nextInt(PALETTE.length);
         setGlow(PALETTE[colorIndex]);
+    }
+
+    private void adjustDateLetterSpacing() {
+        if (dreamDate == null || dreamClock == null) return;
+        CharSequence cs = dreamDate.getText();
+        if (cs == null || cs.length() <= 1) return;
+        // TextClock has textAllCaps="true", so we must measure the uppercase string that is actually drawn!
+        String text = cs.toString().toUpperCase(java.util.Locale.getDefault());
+
+        float targetWidth = 0;
+        if (timeRow != null && timeRow.getWidth() > 0) {
+            targetWidth = timeRow.getWidth();
+        } else if (dreamClock.getWidth() > 0) {
+            targetWidth = dreamClock.getWidth();
+        }
+        if (targetWidth <= 0) return;
+
+        // Leave a 2px safety buffer so the rightmost glyph is never clipped by parent bounds
+        float target = Math.max(0f, targetWidth - 2f);
+
+        if (dreamDate.getLayoutParams() != null) {
+            int tw = Math.round(targetWidth);
+            if (dreamDate.getLayoutParams().width != tw) {
+                dreamDate.getLayoutParams().width = tw;
+                dreamDate.requestLayout();
+            }
+        }
+
+        TextPaint paint = new TextPaint(dreamDate.getPaint());
+        paint.setLetterSpacing(0f);
+        float baseWidth = paint.measureText(text);
+        float em = dreamDate.getTextSize();
+        if (em <= 0) return;
+
+        float extra = target - baseWidth;
+        if (extra > 0) {
+            float spacing = extra / (text.length() * em);
+            paint.setLetterSpacing(spacing);
+            float actualWidth = paint.measureText(text);
+            if (actualWidth > 0 && Math.abs(actualWidth - target) > 0.5f) {
+                float diff = actualWidth - baseWidth;
+                if (Math.abs(diff) > 0.1f) {
+                    spacing = spacing * (extra / diff);
+                }
+            }
+            if (Math.abs(dreamDate.getLetterSpacing() - spacing) > 0.002f) {
+                dreamDate.setLetterSpacing(spacing);
+            }
+        } else {
+            dreamDate.setLetterSpacing(0f);
+        }
     }
 
     void start() {
         content.setAlpha(0f);
         content.post(() -> {
             placeClock();
+            adjustDateLetterSpacing();
             content.animate().alpha(1f).setDuration(1200).start();
         });
         handler.removeCallbacks(tick);

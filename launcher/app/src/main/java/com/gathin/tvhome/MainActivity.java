@@ -2948,7 +2948,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         pill.setContentDescription(pill.getText());
         pill.setText(null);
         pill.setMaxWidth(Integer.MAX_VALUE);
-        pill.setPaddingRelative(0, 0, 0, 0);
+        int pad = Math.round(7 * density);
+        pill.setPaddingRelative(pad, pad, pad, pad);
         pill.setCompoundDrawablePadding(0);
         if (pill.getLayoutParams() != null) {
             pill.getLayoutParams().width = Math.round(36 * density);
