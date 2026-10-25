@@ -1878,7 +1878,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
                 glow.setShape(GradientDrawable.RECTANGLE);
                 glow.setColors(new int[]{c0, c1, c2, c3});
-                glow.setGradientRadius(95f * density);
+                glow.setGradientRadius(100f * density);
                 dockGlow.setImageDrawable(glow);
 
                 View glowParent = (View) dockGlow.getParent();
@@ -1890,8 +1890,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                     float cardCenterX = (cardLoc[0] - parentLoc[0]) + card.getWidth() / 2f;
                     float cardCenterY = (cardLoc[1] - parentLoc[1]) + card.getHeight() / 2f;
-                    float glowW = dockGlow.getWidth() > 0 ? dockGlow.getWidth() : (220f * density);
-                    float glowH = dockGlow.getHeight() > 0 ? dockGlow.getHeight() : (130f * density);
+                    float glowW = dockGlow.getWidth() > 0 ? dockGlow.getWidth() : (260f * density);
+                    float glowH = dockGlow.getHeight() > 0 ? dockGlow.getHeight() : (220f * density);
                     float targetX = cardCenterX - glowW / 2f;
                     float targetY = cardCenterY - glowH / 2f;
 

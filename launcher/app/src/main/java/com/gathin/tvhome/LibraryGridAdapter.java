@@ -67,7 +67,7 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
         View name = v.findViewById(R.id.name);
         ViewGroup.MarginLayoutParams nameLp = (ViewGroup.MarginLayoutParams) name.getLayoutParams();
         nameLp.width = w;
-        nameLp.topMargin = h + Math.round(6 * density);
+        nameLp.topMargin = Math.round(6 * density);
         name.setLayoutParams(nameLp);
 
         return new Holder(v);

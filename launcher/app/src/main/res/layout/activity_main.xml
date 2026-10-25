@@ -156,6 +156,15 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Soft radial glow behind the focused dock app's logo in brand colour -->
+    <ImageView
+        android:id="@+id/dockGlow"
+        android:layout_width="260dp"
+        android:layout_height="220dp"
+        android:layout_gravity="top|start"
+        android:alpha="0"
+        android:importantForAccessibility="no" />
+
     <LinearLayout
         android:id="@+id/mainContent"
         android:layout_width="match_parent"
@@ -422,15 +431,6 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false">
-
-                <!-- Soft radial glow behind the focused dock app's logo -->
-                <ImageView
-                    android:id="@+id/dockGlow"
-                    android:layout_width="220dp"
-                    android:layout_height="130dp"
-                    android:layout_gravity="top|start"
-                    android:alpha="0"
-                    android:importantForAccessibility="no" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/grid"
