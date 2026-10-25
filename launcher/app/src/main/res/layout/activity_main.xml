@@ -28,6 +28,7 @@
         android:id="@+id/ambient"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:visibility="gone"
         android:alpha="0" />
 
     <!-- Race-weekend panel (a theme's race_calendar, see RaceWeekend): in the free space under the clock,
@@ -110,6 +111,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="68dp"
         android:orientation="vertical"
+        android:visibility="gone"
         android:alpha="0">
 
         <TextView
@@ -147,6 +149,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/mainContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -187,7 +190,8 @@
                     android:textSize="12sp"
                     android:fontFamily="@string/font_medium"
                     android:letterSpacing="0.22"
-                    android:textAllCaps="true" />
+                    android:textAllCaps="true"
+                    android:visibility="gone" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -230,7 +234,8 @@
                         android:layout_marginStart="16dp"
                         android:layout_marginEnd="16dp"
                         android:layout_marginBottom="8dp"
-                        android:background="#33FFFFFF" />
+                        android:background="#33FFFFFF"
+                        android:visibility="gone" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -270,7 +275,8 @@
                             android:textSize="14sp"
                             android:fontFamily="@string/font_regular"
                             android:letterSpacing="0.14"
-                            android:textAllCaps="true" />
+                            android:textAllCaps="true"
+                            android:visibility="gone" />
 
                         <!-- Lunar date ("Lunar 13/9 · Year of the Horse"), shown when lunar_date is on. -->
                         <TextView
@@ -323,25 +329,30 @@
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/btnWifi"
+                    style="@style/TopButton"
+                    android:contentDescription="@string/wifi"
+                    android:drawableStart="@drawable/ic_wifi"
+                    android:nextFocusDown="@+id/grid" />
+
+                <TextView
                     android:id="@+id/btnInputs"
                     style="@style/TopButton"
-                    android:text="@string/inputs"
+                    android:contentDescription="@string/inputs"
                     android:drawableStart="@drawable/ic_input"
                     android:nextFocusDown="@+id/grid" />
 
                 <TextView
-                    android:id="@+id/btnWifi"
+                    android:id="@+id/btnSettings"
                     style="@style/TopButton"
-                    android:maxWidth="180dp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:text="@string/wifi"
-                    android:drawableStart="@drawable/ic_wifi"
+                    android:contentDescription="@string/settings"
+                    android:drawableStart="@drawable/ic_settings"
                     android:nextFocusDown="@+id/grid" />
 
                 <TextView
                     android:id="@+id/btnReorder"
                     style="@style/TopButtonIcon"
+                    android:visibility="gone"
                     android:contentDescription="@string/reorder"
                     android:drawableStart="@drawable/ic_swap_vert"
                     android:nextFocusDown="@+id/grid" />
@@ -353,29 +364,24 @@
                     android:contentDescription="@string/app_library"
                     android:drawableStart="@drawable/ic_apps_pill"
                     android:nextFocusDown="@+id/grid" />
-
-                <TextView
-                    android:id="@+id/btnSettings"
-                    style="@style/TopButton"
-                    android:text="@string/settings"
-                    android:drawableStart="@drawable/ic_settings"
-                    android:nextFocusDown="@+id/grid" />
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- The wrapper clips at the grid's edge; the grid itself must not clip so scaled tiles can overflow their cells. -->
-        <FrameLayout
+        <!-- The home row container: single row of main apps centered vertically with More apps button under it -->
+        <LinearLayout
+            android:id="@+id/homeRowContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="10dp">
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clipChildren="false"
+            android:clipToPadding="false">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/grid"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:paddingTop="10dp"
-                android:paddingBottom="40dp"
+                android:layout_height="wrap_content"
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:clipToPadding="false"
@@ -383,14 +389,71 @@
                 android:overScrollMode="never"
                 android:scrollbars="none"
                 android:descendantFocusability="afterDescendants" />
-        </FrameLayout>
+
+            <TextView
+                android:id="@+id/btnMoreApps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="More apps"
+                android:textColor="#B3FFFFFF"
+                android:textSize="15sp"
+                android:fontFamily="@string/font_medium"
+                android:letterSpacing="0.04"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:background="@null"
+                android:focusable="true"
+                android:clickable="true" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- The single floating glass highlight that springs between tiles. -->
+    <!-- Full-screen apps library overlay on the same background -->
+    <LinearLayout
+        android:id="@+id/libraryOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:paddingTop="36dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone"
+        android:alpha="0"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <TextView
+            android:id="@+id/libraryTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="Apps"
+            android:textColor="#E6FFFFFF"
+            android:textSize="22sp"
+            android:fontFamily="@string/font_medium"
+            android:letterSpacing="0.04" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/libraryGrid"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:clipChildren="false"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:descendantFocusability="afterDescendants" />
+    </LinearLayout>
+
+    <!-- The single floating glass highlight: hidden for quiet base -->
     <com.gathin.tvhome.GlassView
         android:id="@+id/glass"
         android:layout_width="10dp"
         android:layout_height="10dp"
+        android:visibility="gone"
         android:alpha="0"
         android:importantForAccessibility="no" />
 </FrameLayout>

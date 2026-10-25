@@ -61,6 +61,7 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.animation.AnimationUtils;
+import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LayoutAnimationController;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -171,6 +172,89 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView greeting;
     private View clockBlock;
     private View btnInputs;
+    private View mainContent;
+    private View btnMoreApps;
+    private View libraryOverlay;
+    private RecyclerView libraryGrid;
+    private LibraryGridAdapter libraryAdapter;
+    private boolean isLibraryOpen;
+    private static final long SCREENSAVER_TIMEOUT_MS = 120_000L; // 2 minutes
+    private boolean isScreensaverActive = false;
+    private final Runnable screensaverRunnable = () -> {
+        isScreensaverActive = true;
+        if (mainContent != null) {
+            mainContent.animate().alpha(0f).setDuration(800).start();
+        }
+        if (libraryOverlay != null && libraryOverlay.getVisibility() == View.VISIBLE) {
+            libraryOverlay.animate().alpha(0f).setDuration(800).start();
+        }
+    };
+
+    private void restartIdleScreensaver() {
+        if (root != null) {
+            root.removeCallbacks(screensaverRunnable);
+            root.postDelayed(screensaverRunnable, SCREENSAVER_TIMEOUT_MS);
+        }
+    }
+
+    private boolean wakeFromScreensaver() {
+        if (!isScreensaverActive) return false;
+        isScreensaverActive = false;
+        if (mainContent != null && !isLibraryOpen) {
+            mainContent.animate().alpha(1f).setDuration(300).start();
+        }
+        if (libraryOverlay != null && isLibraryOpen) {
+            libraryOverlay.animate().alpha(1f).setDuration(300).start();
+        }
+        restartIdleScreensaver();
+        return true;
+    }
+
+    private void openLibraryOverlay() {
+        if (isLibraryOpen) return;
+        isLibraryOpen = true;
+        if (libraryAdapter != null && adapter != null) {
+            libraryAdapter.setItems(adapter.getAllInstalledEntries());
+        }
+        if (libraryOverlay != null) {
+            libraryOverlay.setVisibility(View.VISIBLE);
+            libraryOverlay.animate().alpha(1f).setDuration(200).start();
+        }
+        if (mainContent != null) {
+            mainContent.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                mainContent.setVisibility(View.INVISIBLE);
+            }).start();
+        }
+        if (libraryGrid != null) {
+            libraryGrid.post(() -> {
+                RecyclerView.ViewHolder vh = libraryGrid.findViewHolderForAdapterPosition(0);
+                if (vh != null && vh.itemView != null) {
+                    View card = vh.itemView.findViewById(R.id.card);
+                    if (card != null) card.requestFocus();
+                    else vh.itemView.requestFocus();
+                } else {
+                    libraryGrid.requestFocus();
+                }
+            });
+        }
+    }
+
+    private void closeLibraryOverlay() {
+        if (!isLibraryOpen) return;
+        isLibraryOpen = false;
+        if (mainContent != null) {
+            mainContent.setVisibility(View.VISIBLE);
+            mainContent.animate().alpha(1f).setDuration(200).start();
+        }
+        if (libraryOverlay != null) {
+            libraryOverlay.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                libraryOverlay.setVisibility(View.GONE);
+            }).start();
+        }
+        if (btnMoreApps != null) {
+            btnMoreApps.requestFocus();
+        }
+    }
     /** config show_inputs_pill: false keeps the Inputs pill hidden even when the TV has inputs. */
     private boolean showInputsPill = true;
     private TextView btnWifi;
@@ -557,7 +641,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ((GridLayoutManager) grid.getLayoutManager()).setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override public int getSpanSize(int position) { return !singleRow && adapter != null && adapter.isLibraryAt(position) ? COLUMNS : 1; }
         });
-        grid.setHasFixedSize(true);
+        grid.setHasFixedSize(false);
         grid.setItemAnimator(null);
         // Tiles that scroll out while one is carried come back from the view cache without a rebind; set their
         // dimming again whenever one attaches, so none stays dim after the drop.
@@ -768,7 +852,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
                 return true;
             }
-            int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
+            int firstButton = btnWifi.getVisibility() == View.VISIBLE ? R.id.btnWifi : (btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : R.id.btnSettings);
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
@@ -780,16 +864,71 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnReorder.setOnKeyListener(pillKeys);
         btnLibraryTop.setOnKeyListener(pillKeys);
         for (View button : topAppButtons) button.setOnKeyListener(pillKeys);
-        if (advancedEffects) {
-            List<View> pills = new ArrayList<>(Arrays.asList(btnInputs, btnWifi, btnReorder, btnLibraryTop, btnSettings));
-            pills.addAll(topAppButtons);
-            for (View button : pills) {
-                button.setOnFocusChangeListener((view, focused) -> view.animate()
-                        .scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f)
-                        .setDuration(reducedMotion ? Motion.REDUCED_MS : 160).start());
-            }
-        }
+
+        View.OnFocusChangeListener bareFocus = (view, focused) -> {
+            view.animate()
+                    .scaleX(focused ? 1.15f : 1.0f)
+                    .scaleY(focused ? 1.15f : 1.0f)
+                    .alpha(focused ? 1.0f : 0.75f)
+                    .setDuration(160)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        };
+        btnInputs.setOnFocusChangeListener(bareFocus);
+        btnWifi.setOnFocusChangeListener(bareFocus);
+        btnSettings.setOnFocusChangeListener(bareFocus);
+        btnInputs.setAlpha(0.75f);
+        btnWifi.setAlpha(0.75f);
+        btnSettings.setAlpha(0.75f);
+        btnInputs.setBackground(null);
+        btnWifi.setBackground(null);
+        btnSettings.setBackground(null);
         if (festive) applyFestiveSkin((TextView) btnInputs, (TextView) btnSettings);
+
+        mainContent = findViewById(R.id.mainContent);
+        btnMoreApps = findViewById(R.id.btnMoreApps);
+        if (btnMoreApps != null) {
+            btnMoreApps.setOnFocusChangeListener((v, focused) -> {
+                v.animate().cancel();
+                float scale = focused ? 1.10f : 1.0f;
+                v.animate().scaleX(scale).scaleY(scale)
+                        .alpha(focused ? 1.0f : 0.70f)
+                        .setDuration(160)
+                        .setInterpolator(new DecelerateInterpolator(1.5f))
+                        .start();
+            });
+            btnMoreApps.setOnClickListener(v -> openLibraryOverlay());
+            btnMoreApps.setOnKeyListener((v, keyCode, event) -> {
+                if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (grid != null) {
+                        int pos = lastFocused >= 0 && lastFocused < adapter.getItemCount() ? lastFocused : 0;
+                        RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(pos);
+                        if (vh != null && vh.itemView != null) {
+                            View card = vh.itemView.findViewById(R.id.card);
+                            if (card != null) card.requestFocus();
+                            else vh.itemView.requestFocus();
+                        } else {
+                            grid.requestFocus();
+                        }
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        libraryOverlay = findViewById(R.id.libraryOverlay);
+        libraryGrid = findViewById(R.id.libraryGrid);
+        if (libraryGrid != null) {
+            libraryGrid.setLayoutManager(new GridLayoutManager(this, 6));
+            libraryAdapter = new LibraryGridAdapter(this);
+            libraryGrid.setAdapter(libraryAdapter);
+        }
+        restartIdleScreensaver();
 
         // Hide the glass when focus leaves the tiles.
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
@@ -929,6 +1068,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         restartIdleClock();
+        restartIdleScreensaver();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
         switch (tileRefresh.onResume(packagesChangedSinceRebuild())) {
@@ -1117,6 +1257,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public void onUserInteraction() {
         super.onUserInteraction();
         restartIdleClock();
+        restartIdleScreensaver();
     }
 
     private void restartIdleClock() {
@@ -1128,6 +1269,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onPause() {
         super.onPause();
         root.removeCallbacks(showIdleClock);
+        if (root != null) root.removeCallbacks(screensaverRunnable);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
         stopAmbientAnimation();
@@ -1232,6 +1374,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (wakeFromScreensaver()) {
+            return true;
+        }
+        restartIdleScreensaver();
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
+            if (isLibraryOpen) {
+                closeLibraryOverlay();
+                return true;
+            }
+        }
         if (handleSettingsKey(event)) return true;
         if (tileMenuEnabled && !reordering && openPopup == null && cardPrompt == null
                 && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
@@ -1559,6 +1711,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onBackPressed() {
+        if (isLibraryOpen) {
+            closeLibraryOverlay();
+            return;
+        }
         // Home screen: Back goes nowhere.
     }
 
@@ -1629,23 +1785,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             glassAccent = accent;
             glass.setAccent(accent);
         }
-        if (!glassShown) {
-            springX.cancel();
-            springY.cancel();
-            glass.setTranslationX(x);
-            glass.setTranslationY(y);
-            if (animations && !reducedMotion) glass.animate().alpha(1f).setDuration(180).start();
-            else glass.setAlpha(1f);
-            glassShown = true;
-        } else if (!animations) {
-            springX.cancel();
-            springY.cancel();
-            glass.setTranslationX(x);
-            glass.setTranslationY(y);
-        } else {
-            springX.animateToFinalPosition(x - glassScrollShiftX);
-            springY.animateToFinalPosition(y - glassScrollShift);
-        }
+        glass.setVisibility(View.GONE);
+        glass.setAlpha(0f);
         View item = (View) card.getParent();
         if (dockRow && (singleRow || position < COLUMNS)) {
             // Dock: park it at the bottom of the screen and show the top shelf for this app. In a single row
@@ -2237,7 +2378,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else {
             int lastRowStart = ((count - 1) / COLUMNS) * COLUMNS;
             if (position >= lastRowStart) {
-                if (adapter.isLibraryAt(count)) focusLibrary();
+                if (btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
+                    btnMoreApps.requestFocus();
+                    return true;
+                }
                 return true;
             }
             target = Math.min(position + COLUMNS, count - 1);
@@ -2633,10 +2777,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else if (!TextUtils.equals(btnWifi.getText(), text)) {
             btnWifi.setText(text);
         }
-        if (wifiIconOnly) {
-            btnWifi.setContentDescription(btnWifi.getText());
-            btnWifi.setText(null);
-        }
+        btnWifi.setContentDescription(text);
+        btnWifi.setText(null);
         if (festive && diya != null) {
             if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
             diya.setSteady(steady);
@@ -2673,15 +2815,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** The open library came from that button: closing it returns there instead of scrolling to the grid's end. */
     private boolean libraryFromTopBar;
 
-    /** Turns a labelled top pill into the round TopButtonIcon shape: no text, the icon centred by even padding. */
+    /** Turns a labelled top pill into a bare icon without background */
     private void makeIconOnly(TextView pill) {
         pill.setContentDescription(pill.getText());
         pill.setText(null);
         pill.setMaxWidth(Integer.MAX_VALUE);
-        int pad = Math.round(10 * density);
-        pill.setPaddingRelative(pad, 0, pad, 0);
+        pill.setPaddingRelative(0, 0, 0, 0);
         pill.setCompoundDrawablePadding(0);
-        pill.getLayoutParams().width = Math.round(42 * density);
+        if (pill.getLayoutParams() != null) {
+            pill.getLayoutParams().width = Math.round(36 * density);
+            pill.getLayoutParams().height = Math.round(36 * density);
+        }
+        pill.setBackground(null);
     }
 
     // ---- festive skin ------------------------------------------------------------------------------
@@ -2856,7 +3001,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      *  with that scheme and no MIME type. A player guarded by a permission this build does not declare
      *  throws SecurityException, which used to take Home down with it (YaOS before the manifest asked
      *  for ACCESS_TV_SOURCE). */
-    private void openInput(String inputId) {
+    void openInput(String inputId) {
         // A CEC device is a child input of its HDMI port; the vendor source number belongs to the port
         // (MiTV-MFFU0). Only that lookup uses the parent: the generic path below still opens the child.
         String sourceId = inputId;
