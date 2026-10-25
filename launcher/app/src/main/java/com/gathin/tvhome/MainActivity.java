@@ -1870,15 +1870,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (dockGlow != null) {
                 int c = BRAND_COLORS[position];
                 int r = Color.red(c), g = Color.green(c), b = Color.blue(c);
-                int c0 = Color.argb(175, r, g, b);
-                int c1 = Color.argb(90, r, g, b);
-                int c2 = Color.argb(25, r, g, b);
+                int c0 = Color.argb(65, r, g, b);
+                int c1 = Color.argb(32, r, g, b);
+                int c2 = Color.argb(10, r, g, b);
                 int c3 = Color.argb(0, r, g, b);
                 GradientDrawable glow = new GradientDrawable();
                 glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
                 glow.setShape(GradientDrawable.RECTANGLE);
                 glow.setColors(new int[]{c0, c1, c2, c3});
-                glow.setGradientRadius(100f * density);
+                glow.setGradientRadius(140f * density);
                 dockGlow.setImageDrawable(glow);
 
                 View glowParent = (View) dockGlow.getParent();
@@ -1890,8 +1890,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                     float cardCenterX = (cardLoc[0] - parentLoc[0]) + card.getWidth() / 2f;
                     float cardCenterY = (cardLoc[1] - parentLoc[1]) + card.getHeight() / 2f;
-                    float glowW = dockGlow.getWidth() > 0 ? dockGlow.getWidth() : (260f * density);
-                    float glowH = dockGlow.getHeight() > 0 ? dockGlow.getHeight() : (220f * density);
+                    float glowW = dockGlow.getWidth() > 0 ? dockGlow.getWidth() : (320f * density);
+                    float glowH = dockGlow.getHeight() > 0 ? dockGlow.getHeight() : (260f * density);
                     float targetX = cardCenterX - glowW / 2f;
                     float targetY = cardCenterY - glowH / 2f;
 

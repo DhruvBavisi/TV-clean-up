@@ -159,8 +159,8 @@
     <!-- Soft radial glow behind the focused dock app's logo in brand colour -->
     <ImageView
         android:id="@+id/dockGlow"
-        android:layout_width="260dp"
-        android:layout_height="220dp"
+        android:layout_width="320dp"
+        android:layout_height="260dp"
         android:layout_gravity="top|start"
         android:alpha="0"
         android:importantForAccessibility="no" />
@@ -420,7 +420,7 @@
                 android:layout_marginBottom="8dp"
                 android:text=""
                 android:textColor="#F0FFFFFF"
-                android:textSize="26sp"
+                android:textSize="32sp"
                 android:fontFamily="@font/outfit_light"
                 android:letterSpacing="0.03"
                 android:alpha="0"
@@ -450,6 +450,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
+                android:translationY="-12dp"
                 android:text="More apps"
                 android:textColor="#B3FFFFFF"
                 android:textSize="15sp"
