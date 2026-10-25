@@ -327,6 +327,21 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <TextClock
+                    android:id="@+id/homeDate"
+                    android:gravity="left"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginTop="3dp"
+                    android:format12Hour="@string/date_format"
+                    android:format24Hour="@string/date_format"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="@font/outfit_regular"
+                    android:letterSpacing="0.10"
+                    android:textAllCaps="true" />
+
             </LinearLayout>
 
             <!-- Shown only when show_stats is on. Outside leftBlock, so the top buttons stay level with the clock

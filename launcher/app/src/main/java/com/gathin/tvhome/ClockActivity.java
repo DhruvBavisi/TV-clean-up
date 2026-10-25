@@ -18,6 +18,7 @@ public class ClockActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(R.anim.screensaver_fade_in, R.anim.screensaver_fade_out);
         setContentView(R.layout.dream_clock);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE);
@@ -40,8 +41,11 @@ public class ClockActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // The key that wakes the clock should not also act on Home, so it is consumed here.
-        if (event.getAction() == KeyEvent.ACTION_UP) finish();
+        // The first button pressed immediately wakes and dismisses the screensaver.
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            finish();
+            return true;
+        }
         return true;
     }
 
@@ -54,6 +58,6 @@ public class ClockActivity extends Activity {
     @Override
     public void finish() {
         super.finish();
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        overridePendingTransition(R.anim.screensaver_fade_in, R.anim.screensaver_fade_out);
     }
 }

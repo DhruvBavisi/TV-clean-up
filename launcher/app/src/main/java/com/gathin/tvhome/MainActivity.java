@@ -122,7 +122,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private long settingsRevision;
     /** Idle time on Home before ClockActivity; 0 is off (config.xml, home_idle_clock_minutes). */
     private long idleClockMs;
-    private final Runnable showIdleClock = () -> startActivity(new Intent(this, ClockActivity.class));
+    private final Runnable showIdleClock = () -> {
+        startActivity(new Intent(this, ClockActivity.class));
+        overridePendingTransition(R.anim.screensaver_fade_in, R.anim.screensaver_fade_out);
+    };
     private String liveTvAction;
     private String liveTvInputId;
     /** The app library is on (config.xml, app_library): only then can the tile menu take an app off Home. */
@@ -183,17 +186,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView libraryGrid;
     private LibraryGridAdapter libraryAdapter;
     private boolean isLibraryOpen;
-    private static final long SCREENSAVER_TIMEOUT_MS = 300_000L; // 5 minutes
-    private boolean isScreensaverActive = false;
-    private final Runnable screensaverRunnable = () -> {
-        isScreensaverActive = true;
-        if (mainContent != null) {
-            mainContent.animate().alpha(0f).setDuration(800).start();
-        }
-        if (libraryOverlay != null && libraryOverlay.getVisibility() == View.VISIBLE) {
-            libraryOverlay.animate().alpha(0f).setDuration(800).start();
-        }
-    };
 
     private static final String[][] APP_TAGLINES = {
         // Netmirror (position 0)
@@ -317,26 +309,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             weatherIcon.setImageResource(R.drawable.ic_weather_rain);
         }
         weatherBlock.setVisibility(View.VISIBLE);
-    }
-
-    private void restartIdleScreensaver() {
-        if (root != null) {
-            root.removeCallbacks(screensaverRunnable);
-            root.postDelayed(screensaverRunnable, SCREENSAVER_TIMEOUT_MS);
-        }
-    }
-
-    private boolean wakeFromScreensaver() {
-        if (!isScreensaverActive) return false;
-        isScreensaverActive = false;
-        if (mainContent != null && !isLibraryOpen) {
-            mainContent.animate().alpha(1f).setDuration(300).start();
-        }
-        if (libraryOverlay != null && isLibraryOpen) {
-            libraryOverlay.animate().alpha(1f).setDuration(300).start();
-        }
-        restartIdleScreensaver();
-        return true;
     }
 
     private void openLibraryOverlay() {
@@ -1033,7 +1005,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             libraryAdapter = new LibraryGridAdapter(this);
             libraryGrid.setAdapter(libraryAdapter);
         }
-        restartIdleScreensaver();
 
         // Hide the glass when focus leaves the tiles.
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
@@ -1168,7 +1139,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         restartIdleClock();
-        restartIdleScreensaver();
+        if (mainContent != null && !isLibraryOpen) {
+            mainContent.setAlpha(1f);
+            mainContent.setVisibility(View.VISIBLE);
+        }
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
         taglineRotation = (taglineRotation + 1) % 5;
@@ -1360,7 +1334,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public void onUserInteraction() {
         super.onUserInteraction();
         restartIdleClock();
-        restartIdleScreensaver();
     }
 
     private void restartIdleClock() {
@@ -1372,7 +1345,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onPause() {
         super.onPause();
         root.removeCallbacks(showIdleClock);
-        if (root != null) root.removeCallbacks(screensaverRunnable);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
         stopAmbientAnimation();
@@ -1477,10 +1449,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (wakeFromScreensaver()) {
-            return true;
-        }
-        restartIdleScreensaver();
+        restartIdleClock();
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
             if (isLibraryOpen) {
                 closeLibraryOverlay();
