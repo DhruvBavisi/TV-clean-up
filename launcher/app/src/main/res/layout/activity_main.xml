@@ -370,7 +370,7 @@
                     android:id="@+id/btnInputs"
                     style="@style/TopButton"
                     android:contentDescription="@string/inputs"
-                    android:drawableStart="@drawable/ic_input"
+                    android:drawableStart="@drawable/ic_top_input"
                     android:nextFocusDown="@+id/grid" />
 
                 <TextView
@@ -406,7 +406,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="bottom|center_horizontal"
-            android:paddingBottom="16dp"
+            android:paddingBottom="4dp"
             android:clipChildren="false"
             android:clipToPadding="false">
 
@@ -417,7 +417,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="left|start"
                 android:layout_marginStart="20dp"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="8dp"
                 android:text=""
                 android:textColor="#F0FFFFFF"
                 android:textSize="26sp"
@@ -449,7 +449,7 @@
                 android:id="@+id/btnMoreApps"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="6dp"
                 android:text="More apps"
                 android:textColor="#B3FFFFFF"
                 android:textSize="15sp"
@@ -457,8 +457,8 @@
                 android:letterSpacing="0.04"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
                 android:background="@null"
                 android:focusable="true"
                 android:clickable="true" />

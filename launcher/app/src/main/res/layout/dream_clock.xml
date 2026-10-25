@@ -14,6 +14,9 @@
         android:id="@+id/dreamContent"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="60dp"
+        android:layout_marginBottom="44dp"
         android:orientation="vertical">
 
         <LinearLayout

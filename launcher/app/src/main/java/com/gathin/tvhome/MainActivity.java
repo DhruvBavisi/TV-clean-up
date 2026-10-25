@@ -183,7 +183,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView libraryGrid;
     private LibraryGridAdapter libraryAdapter;
     private boolean isLibraryOpen;
-    private static final long SCREENSAVER_TIMEOUT_MS = 120_000L; // 2 minutes
+    private static final long SCREENSAVER_TIMEOUT_MS = 300_000L; // 5 minutes
     private boolean isScreensaverActive = false;
     private final Runnable screensaverRunnable = () -> {
         isScreensaverActive = true;

@@ -414,16 +414,16 @@
          Can also be set with "fade_rows": true in a theme's config.json. -->
     <bool name="fade_rows">false</bool>
     <!-- Minutes Home may sit untouched before it shows the idle screensaver; 0 turns it off. -->
-    <integer name="home_idle_clock_minutes">2</integer>
+    <integer name="home_idle_clock_minutes">5</integer>
     <!-- The clock screensaver (Home idle clock and the system screensaver) over Home's wallpaper instead of black with
          a coloured glow. The clock still moves every minute. Can also be set with "clock_wallpaper" in a theme. -->
-    <bool name="clock_wallpaper">false</bool>
+    <bool name="clock_wallpaper">true</bool>
     <!-- How dark that wallpaper is behind the clock, 0 to 90 %. Can also be set with "clock_wallpaper_dim". -->
-    <integer name="clock_wallpaper_dim">50</integer>
+    <integer name="clock_wallpaper_dim">85</integer>
     <!-- The clock screensaver's slow coloured glow behind the clock. false leaves the clock and date alone on plain black
          (OLED panels); they still move every minute. Ignored while clock_wallpaper shows a picture. Can also be set
          with "clock_glow" in a theme. -->
-    <bool name="clock_glow">true</bool>
+    <bool name="clock_glow">false</bool>
     <!-- Shape of the glow behind the focused app, in its colour: radial (a soft glow, the default) or horizon (the
          colour washes down from the top edge and fades to black, brightest along the top). The cinematic shelf
          keeps its own glow. Can also be set with "glow_style": "horizon" in a theme's config.json. -->

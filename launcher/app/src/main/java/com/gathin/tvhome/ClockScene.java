@@ -109,6 +109,10 @@ final class ClockScene {
             return;
         }
         wallpaperFile = cfg.wallpaper != null ? cfg.wallpaper : cfg.wallpapers.isEmpty() ? null : cfg.wallpapers.get(0);
+        if (wallpaperFile == null) {
+            File direct = new File("/sdcard/wallpaper.png");
+            if (direct.isFile() && direct.length() > 0) wallpaperFile = direct;
+        }
         wallpaperShade = (cfg.clockWallpaperDim * 255 / 100) << 24;
         wallpaperRes = ctx.getResources();
     }
@@ -153,7 +157,7 @@ final class ClockScene {
                 options.inDensity = scale[0];
                 options.inTargetDensity = scale[1];
             }
-            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
             return BitmapFactory.decodeFile(file.getPath(), options);
         } catch (Exception | OutOfMemoryError failure) {
             return null;
@@ -161,25 +165,19 @@ final class ClockScene {
     }
 
     private void moveClock() {
-        content.animate().alpha(0f).setDuration(900).withLayer().withEndAction(() -> {
-            placeClock();
-            content.animate().alpha(1f).setDuration(1200).withLayer().start();
-        }).start();
+        // Kept fixed at the bottom left
     }
 
-    /** A random spot that keeps the whole clock on screen, with the glow centred behind it. */
+    /** Fixed at bottom-left corner with comfortable TV margins. */
     private void placeClock() {
         View parent = (View) content.getParent();
-        int maxX = Math.max(0, parent.getWidth() - content.getWidth());
-        int maxY = Math.max(0, parent.getHeight() - content.getHeight());
-        float x = maxX * (0.1f + 0.8f * random.nextFloat());
-        float y = maxY * (0.1f + 0.8f * random.nextFloat());
+        float dp = content.getResources().getDisplayMetrics().density;
+        float x = 60f * dp;
+        int parentH = parent != null && parent.getHeight() > 0 ? parent.getHeight() : content.getResources().getDisplayMetrics().heightPixels;
+        int contentH = content.getHeight() > 0 ? content.getHeight() : Math.round(180f * dp);
+        float y = parentH - contentH - 44f * dp;
         content.setX(x);
         content.setY(y);
-        if (parent.getWidth() > 0 && parent.getHeight() > 0) {
-            glow.setGradientCenter((x + content.getWidth() / 2f) / parent.getWidth(),
-                    (y + content.getHeight() / 2f) / parent.getHeight());
-        }
     }
 
     private void shiftGlow() {
