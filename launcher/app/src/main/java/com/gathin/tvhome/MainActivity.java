@@ -78,9 +78,14 @@ import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.LocalDate;
+import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -189,6 +194,130 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             libraryOverlay.animate().alpha(0f).setDuration(800).start();
         }
     };
+
+    private static final String[][] APP_TAGLINES = {
+        // Netmirror (position 0)
+        {
+            "Bazinga.",
+            "Are you still watching?",
+            "One more episode.",
+            "Previously on...",
+            "Just one season."
+        },
+        // Prime Video (position 1)
+        {
+            "Run, Barry, run.",
+            "Diabolical.",
+            "Free one-day delivery for your feelings.",
+            "What could go wrong?",
+            "It was Agatha all along... wait, wrong app."
+        },
+        // Jiohotstar (position 2)
+        {
+            "Sixer on the last ball.",
+            "Dhoni finishes off in style!",
+            "Stream the drama.",
+            "Cricket, cinema & everything in between.",
+            "Match day vibes."
+        },
+        // YouTube (position 3)
+        {
+            "Don't forget to like and subscribe.",
+            "Down the rabbit hole.",
+            "3 AM tutorials you'll never use.",
+            "Just 5 more minutes.",
+            "Next video in 5... 4... 3..."
+        },
+        // SonyLIV (position 4)
+        {
+            "Har scam ki ek kahani hoti hai.",
+            "Risk hai toh ishq hai.",
+            "Binge on the edge of your seat.",
+            "Champions League nights.",
+            "Living the LIV life."
+        },
+        // PS5 (position 5)
+        {
+            "Play Has No Limits.",
+            "Press X to continue.",
+            "Boy.",
+            "Praise the sun.",
+            "Welcome back, player."
+        }
+    };
+
+    private static final int[] BRAND_COLORS = {
+        0xFFE50914, // Netflix Red
+        0xFF00A8E1, // Prime Video Electric Blue
+        0xFF1E88E5, // Jiohotstar Blue
+        0xFFFF0000, // YouTube Red
+        0xFFFF9900, // SonyLIV Amber
+        0xFF0070D1  // PlayStation Blue
+    };
+
+    private static int taglineRotation = 0;
+    private TextView dockTagline;
+    private ImageView dockGlow;
+    private View wallpaperGradientScrim;
+    private View weatherBlock;
+    private ImageView weatherIcon;
+    private TextView weatherTemp;
+    private static long lastWeatherFetchTime = 0L;
+    private static int cachedWeatherCode = -1;
+    private static int cachedTemp = Integer.MIN_VALUE;
+    private static final long WEATHER_FETCH_INTERVAL_MS = 30 * 60_000L; // 30 minutes
+
+    private void fetchWeatherIfNeeded() {
+        long now = SystemClock.elapsedRealtime();
+        if (cachedTemp != Integer.MIN_VALUE) {
+            applyWeatherUi(cachedWeatherCode, cachedTemp);
+        }
+        if (now - lastWeatherFetchTime < WEATHER_FETCH_INTERVAL_MS && lastWeatherFetchTime != 0) {
+            return;
+        }
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL("https://api.open-meteo.com/v1/forecast?latitude=19.076&longitude=72.8777&current=temperature_2m,weather_code");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(6000);
+                conn.setReadTimeout(6000);
+                conn.setRequestMethod("GET");
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONObject cur = json.getJSONObject("current");
+                    int code = cur.getInt("weather_code");
+                    double tempD = cur.getDouble("temperature_2m");
+                    int temp = (int) Math.round(tempD);
+                    lastWeatherFetchTime = SystemClock.elapsedRealtime();
+                    cachedWeatherCode = code;
+                    cachedTemp = temp;
+                    runOnUiThread(() -> applyWeatherUi(code, temp));
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
+    }
+
+    private void applyWeatherUi(int code, int temp) {
+        if (weatherBlock == null || weatherIcon == null || weatherTemp == null) return;
+        weatherTemp.setText(temp + "°C");
+        if (code <= 1) {
+            weatherIcon.setImageResource(R.drawable.ic_weather_sunny);
+        } else if (code <= 48) {
+            weatherIcon.setImageResource(R.drawable.ic_weather_cloudy);
+        } else {
+            weatherIcon.setImageResource(R.drawable.ic_weather_rain);
+        }
+        weatherBlock.setVisibility(View.VISIBLE);
+    }
 
     private void restartIdleScreensaver() {
         if (root != null) {
@@ -673,50 +802,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
         int rowsBelowDock = cfg.rowsBelowDock;
-        grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
-            int h = b - t;
-            // Item height follows the tile size, which follows the columns and the rows that must fit (AppAdapter.tileWidthPx).
-            int inner = (r - l) - grid.getPaddingLeft() - grid.getPaddingRight();
-            int tileW = AppAdapter.tileWidthPx(inner, h, COLUMNS, rowsBelowDock, cfg.dockTitle, cfg.dockRow, density);
-            int itemH = AppAdapter.itemHeightPx(AppAdapter.tileHeightPx(tileW), density);
-            int dockRow = itemH + (int) (AppAdapter.DOCK_EXTRA_DP * density);   // item height plus DockDecoration offsets
-            int gridRows = itemH * rowsBelowDock;
-            // Keep the hero below the header when the library is enabled on a short screen,
-            // even when the theme requests an extra visible row below the dock.
-            int shelfClearance = cfg.appLibrary ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
-            int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
-            // Where the rows cannot fit even at the smallest tile (3 rows with the title on), the title keeps its
-            // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
-            if (MainActivity.this.dockRow && cfg.dockTitle && rowsBelowDock > 0) want = Math.max(want, (int) (AppAdapter.TITLE_ROOM_DP * density));
-            // No dock to push down: the grid starts at the top, with room for the first row's zoom and glass.
-            if (!MainActivity.this.dockRow) want = (int) (AppAdapter.TOP_ROOM_DP * density);
-            // A single row never shows the names under its tiles (the title above the row names the app), so the
-            // 7dp gap and 22dp label item_app.xml keeps for them would only lift the row: sit it that much lower.
-            if (singleRow && !cfg.alwaysShowNames) want += (int) (29 * density);
-            if (grid.getPaddingTop() != want) {
-                grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
-                // A vertical grid parks the dock on the new padding line by scrolling (onTileFocused); a sideways
-                // row cannot scroll vertically, and the layout request made from inside this layout pass is
-                // dropped, so lay the row out again on the next frame. The glass and the title were placed for the
-                // old position, so fit them again once it has moved.
-                if (singleRow) grid.post(() -> {
-                    grid.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                        @Override
-                        public void onGlobalLayout() {
-                            grid.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                            int pos = Math.max(0, Math.min(lastFocused, adapter.appCount() - 1));
-                            RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(pos);
-                            View card = vh == null ? null : vh.itemView.findViewById(R.id.card);
-                            if (card != null && card.isFocused()) onTileFocused(pos, card);
-                        }
-                    });
-                    grid.requestLayout();
-                });
-            }
-            // Cold start or column count > 4: the first focus can run before the grid has its final width or
-            // padding, leaving the glass at the XML design size until a key is pressed.
-            grid.post(this::refitGlass);
-        });
+        grid.setPadding(0, 0, 0, 0);
+        grid.post(this::refitGlass);
 
         // Keep the glass glued to its tile while the grid scrolls.
         grid.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -873,6 +960,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .setDuration(160)
                     .setInterpolator(new DecelerateInterpolator())
                     .start();
+            if (focused) {
+                if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
+                if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
+            }
         };
         btnInputs.setOnFocusChangeListener(bareFocus);
         btnWifi.setOnFocusChangeListener(bareFocus);
@@ -885,6 +976,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnSettings.setBackground(null);
         if (festive) applyFestiveSkin((TextView) btnInputs, (TextView) btnSettings);
 
+        wallpaperGradientScrim = findViewById(R.id.wallpaperGradientScrim);
+        dockTagline = findViewById(R.id.dockTagline);
+        dockGlow = findViewById(R.id.dockGlow);
+        weatherBlock = findViewById(R.id.weatherBlock);
+        weatherIcon = findViewById(R.id.weatherIcon);
+        weatherTemp = findViewById(R.id.weatherTemp);
+
         mainContent = findViewById(R.id.mainContent);
         btnMoreApps = findViewById(R.id.btnMoreApps);
         if (btnMoreApps != null) {
@@ -896,6 +994,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         .setDuration(160)
                         .setInterpolator(new DecelerateInterpolator(1.5f))
                         .start();
+                if (wallpaperGradientScrim != null) {
+                    wallpaperGradientScrim.animate().alpha(focused ? 1.0f : 0.70f).setDuration(200).start();
+                }
+                if (focused) {
+                    if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
+                    if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
+                }
             });
             btnMoreApps.setOnClickListener(v -> openLibraryOverlay());
             btnMoreApps.setOnKeyListener((v, keyCode, event) -> {
@@ -1026,16 +1131,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (openLauncherSettingsIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
-        grid.scrollToPosition(0);
-        lastFocused = 0;
-        lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
-        if (stopped) {
-            tileRefresh.onHomeAgain();
-        } else {
-            // Still on screen (the quick panel was over it, or Home was already in front): the tiles are current,
-            // so only go back to the first one; rebuilding would replay the entrance animation for nothing.
-            grid.post(() -> focusTile(0));
+        if (isLibraryOpen) {
+            closeLibraryOverlay();
         }
+        taglineRotation = (taglineRotation + 1) % 5;
+        grid.post(() -> focusTile(lastFocused));
     }
 
     @Override
@@ -1071,6 +1171,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         restartIdleScreensaver();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
+        taglineRotation = (taglineRotation + 1) % 5;
+        fetchWeatherIfNeeded();
+        grid.post(() -> focusTile(lastFocused));
         switch (tileRefresh.onResume(packagesChangedSinceRebuild())) {
             case REBUILD:
                 tilesReady = false;
@@ -1755,60 +1858,84 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             });
             return;
         }
-        // Tile rect in root coordinates, using layout positions (ignores the scale animation).
-        Rect r = tileRect;
-        r.set(0, 0, card.getWidth(), card.getHeight());
-        root.offsetDescendantRectToMyCoords(card, r);
-        float pad = 6f * density;        // matches GlassView's glow inset
-        float scale = adapter.focusScale();
-        float w = card.getWidth() * scale + 2 * pad;
-        float h = card.getHeight() * scale + 2 * pad;
-        float x = r.exactCenterX() - w / 2f;
-        float y = r.exactCenterY() - h / 2f - (advancedEffects ? 4f * density : 0f);
 
-        ViewGroup.LayoutParams lp = glass.getLayoutParams();
-        if (lp.width != (int) w || lp.height != (int) h || card.getWidth() != glassCardW) {
-            lp.width = (int) w;
-            lp.height = (int) h;
-            glass.setLayoutParams(lp);
-            // GlassView draws its slab inset by pad, i.e. exactly over the zoomed tile: same corners as the tile.
-            glass.setRadius(AppAdapter.cornerRadius(card.getWidth(), density) * scale);
+        if (position >= 0 && position < 6) {
+            if (dockTagline != null) {
+                String[] tags = APP_TAGLINES[position];
+                String tag = tags[taglineRotation % tags.length];
+                dockTagline.setText(tag);
+                dockTagline.animate().cancel();
+                dockTagline.animate().alpha(1.0f).setDuration(200).start();
+            }
+            if (dockGlow != null) {
+                int c = BRAND_COLORS[position];
+                int r = Color.red(c), g = Color.green(c), b = Color.blue(c);
+                int c0 = Color.argb(175, r, g, b);
+                int c1 = Color.argb(90, r, g, b);
+                int c2 = Color.argb(25, r, g, b);
+                int c3 = Color.argb(0, r, g, b);
+                GradientDrawable glow = new GradientDrawable();
+                glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+                glow.setShape(GradientDrawable.RECTANGLE);
+                glow.setColors(new int[]{c0, c1, c2, c3});
+                glow.setGradientRadius(95f * density);
+                dockGlow.setImageDrawable(glow);
+
+                View glowParent = (View) dockGlow.getParent();
+                if (glowParent != null) {
+                    int[] cardLoc = new int[2];
+                    card.getLocationOnScreen(cardLoc);
+                    int[] parentLoc = new int[2];
+                    glowParent.getLocationOnScreen(parentLoc);
+
+                    float cardCenterX = (cardLoc[0] - parentLoc[0]) + card.getWidth() / 2f;
+                    float cardCenterY = (cardLoc[1] - parentLoc[1]) + card.getHeight() / 2f;
+                    float glowW = dockGlow.getWidth() > 0 ? dockGlow.getWidth() : (220f * density);
+                    float glowH = dockGlow.getHeight() > 0 ? dockGlow.getHeight() : (130f * density);
+                    float targetX = cardCenterX - glowW / 2f;
+                    float targetY = cardCenterY - glowH / 2f;
+
+                    dockGlow.animate().cancel();
+                    if (dockGlow.getAlpha() == 0f) {
+                        dockGlow.setTranslationX(targetX);
+                        dockGlow.setTranslationY(targetY);
+                        dockGlow.animate().alpha(1.0f).setDuration(220).start();
+                    } else {
+                        dockGlow.animate()
+                                .translationX(targetX)
+                                .translationY(targetY)
+                                .alpha(1.0f)
+                                .setDuration(200)
+                                .setInterpolator(new DecelerateInterpolator(1.5f))
+                                .start();
+                    }
+                }
+            }
+            if (wallpaperGradientScrim != null) {
+                wallpaperGradientScrim.animate().alpha(0.70f).setDuration(200).start();
+            }
+            card.animate().cancel();
+            card.animate().scaleX(1.15f).scaleY(1.15f).setDuration(160).start();
+            View parent = (View) card.getParent();
+            if (parent != null) {
+                View name = parent.findViewById(R.id.name);
+                if (name != null) {
+                    name.animate().cancel();
+                    name.animate().alpha(1.0f).setDuration(160).start();
+                }
+                View banner = card.findViewById(R.id.banner);
+                if (banner != null) {
+                    banner.animate().cancel();
+                    banner.animate().alpha(1.0f).setDuration(160).start();
+                }
+            }
+        } else {
+            if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
+            if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
         }
-        glassCardW = card.getWidth();
-        glassTargetX = x;
-        glassTargetY = y;
-        // Cinematic shelf: the highlight glows in the dock app's colour, plain white in the grid (and on the dock with
-        // cinematic_white_focus). app_glow: every tile. In a single row every tile is the dock's kind.
-        boolean coloured = (appGlow || cinematic && !cinematicWhiteFocus && (singleRow || position < COLUMNS)) && !festive;
-        int accent = coloured ? adapter.ambientColorAt(position) : 0;
-        if ((cinematic || appGlow) && !festive && accent != glassAccent) {
-            glassAccent = accent;
-            glass.setAccent(accent);
-        }
+
         glass.setVisibility(View.GONE);
         glass.setAlpha(0f);
-        View item = (View) card.getParent();
-        if (dockRow && (singleRow || position < COLUMNS)) {
-            // Dock: park it at the bottom of the screen and show the top shelf for this app. In a single row
-            // every tile is in the dock's row, which never scrolls vertically.
-            int decoratedTop = item.getTop() - (int) (6 * density);
-            int dy = decoratedTop - grid.getPaddingTop();
-            // A 1px mismatch used to start a scroll on every dock move. Only scroll when the row is
-            // actually off; reduced motion does it in one jump so it does not fight the highlight.
-            boolean scroll = !singleRow && Math.abs(dy) > (int) (8 * density);
-            if (scroll) {
-                if (!animations || reducedMotion) grid.scrollBy(0, dy);
-                else grid.smoothScrollBy(0, dy);
-            }
-            showHero(position, scroll ? r.top - dy : r.top);
-        } else {
-            // Below the dock (or in a plain grid) the glow follows the tile without the big name; letting it
-            // fade out left the grid on plain black.
-            showGlowOnly(position);
-            // Scroll just enough so the whole glass (not only the tile) is visible.
-            revealRect.set(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
-            grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
-        }
     }
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
@@ -2345,52 +2472,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     public boolean onTileVerticalKey(int position, int keyCode) {
         int count = adapter.appCount();
-        int target;
-        if (singleRow) {
-            // One row: Up leaves for the top bar, Down has nowhere to go, and Left/Right walk the whole row,
-            // stopping at its two ends (the default focus search scrolls the row to the next tile).
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return false;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) return true;
-            boolean forward = rtlAppGrid ? keyCode == KeyEvent.KEYCODE_DPAD_LEFT : keyCode == KeyEvent.KEYCODE_DPAD_RIGHT;
-            int last = adapter.focusablePosition(count - 1);
-            if (forward && position >= last) {
-                if (adapter.isLibraryAt(count)) focusLibrary();
-                return true;
-            }
-            return !forward && position == 0;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            if (position == 0) return true;
+            return false;
         }
-        // Horizontal: swallow the key at a row's ends so focus never wraps to the next row or
-        // escapes up into the top bar. Mid-row moves fall through to the default focus search.
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            boolean forward = rtlAppGrid ? keyCode == KeyEvent.KEYCODE_DPAD_LEFT : keyCode == KeyEvent.KEYCODE_DPAD_RIGHT;
-            if (forward && position == adapter.focusablePosition(count - 1) && adapter.isLibraryAt(count)) {
-                focusLibrary();
-                return true;
-            }
-            // In the dock, the last app is the row's end: the empty slots after it take no focus.
-            int rowCount = position < COLUMNS ? Math.min(count, adapter.dockFilled()) : count;
-            return GridNavigation.atHorizontalEdge(position, rowCount, COLUMNS,
-                    rtlAppGrid, keyCode == KeyEvent.KEYCODE_DPAD_LEFT);
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            if (position >= count - 1) return true;
+            return false;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-            if (position < COLUMNS) return false;          // dock row: let focus move to the top bar
-            target = position - COLUMNS;
-        } else {
-            int lastRowStart = ((count - 1) / COLUMNS) * COLUMNS;
-            if (position >= lastRowStart) {
-                if (btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
-                    btnMoreApps.requestFocus();
-                    return true;
-                }
+            View target = (btnWifi != null && btnWifi.getVisibility() == View.VISIBLE) ? btnWifi
+                    : ((btnInputs != null && btnInputs.getVisibility() == View.VISIBLE) ? btnInputs : findViewById(R.id.btnSettings));
+            if (target != null) {
+                target.requestFocus();
                 return true;
             }
-            target = Math.min(position + COLUMNS, count - 1);
+            return false;
         }
-        focusTile(target);
-        // The default focus search clicks for Left/Right; Up/Down are handled here, so click for them too.
-        grid.playSoundEffect(keyCode == KeyEvent.KEYCODE_DPAD_UP
-                ? SoundEffectConstants.NAVIGATION_UP : SoundEffectConstants.NAVIGATION_DOWN);
-        return true;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
+                btnMoreApps.requestFocus();
+                return true;
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override public void onLibraryFocused() {

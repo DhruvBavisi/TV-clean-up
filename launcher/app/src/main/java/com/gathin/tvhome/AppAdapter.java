@@ -315,10 +315,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 fresh.add(new Entry(label, component, banner, icon));
             }
         }
-        Drawable psBanner = ctx.getDrawable(R.drawable.banner_playstation);
+        Drawable psBanner = ctx.getDrawable(R.drawable.logo_playstation);
         Entry psEntry = new Entry(
                 Entry.HDMI_INPUT,
-                "PlayStation",
+                "PS5",
                 new ComponentName("com.sony.dtv.tvinput.external", "HW2"),
                 "input:com.sony.dtv.tvinput.external/.ExternalTvInputService/HW2",
                 psBanner,
@@ -353,16 +353,53 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
         List<Entry> mainRow = new ArrayList<>();
         for (String fav : favourites) {
+            Entry match = null;
             for (Entry e : fresh) {
                 if (fav.equals(e.pkg)) {
-                    mainRow.add(e);
+                    match = e;
                     break;
                 }
+            }
+            if (match != null) {
+                Drawable logo = getDockLogo(match.pkg);
+                String label = getDockLabel(match.pkg, match.label);
+                mainRow.add(new Entry(
+                        match.kind,
+                        label,
+                        match.component,
+                        match.pkg,
+                        logo != null ? logo : match.banner,
+                        match.icon,
+                        null,
+                        match.ambient
+                ));
             }
         }
         items.clear();
         items.addAll(mainRow);
         notifyDataSetChanged();
+    }
+
+    private Drawable getDockLogo(String pkg) {
+        if ("app.netmirror.newtv".equals(pkg)) return ctx.getDrawable(R.drawable.logo_netmirror);
+        if ("com.amazon.amazonvideo.livingroom".equals(pkg)) return ctx.getDrawable(R.drawable.logo_prime);
+        if ("in.startv.hotstar".equals(pkg)) return ctx.getDrawable(R.drawable.logo_jiohotstar);
+        if ("com.google.android.youtube.tv".equals(pkg)) return ctx.getDrawable(R.drawable.logo_youtube);
+        if ("com.sonyliv".equals(pkg)) return ctx.getDrawable(R.drawable.logo_sonyliv);
+        if (pkg != null && (pkg.contains("HW2") || pkg.contains("playstation") || pkg.contains("external"))) {
+            return ctx.getDrawable(R.drawable.logo_playstation);
+        }
+        return null;
+    }
+
+    private String getDockLabel(String pkg, String fallback) {
+        if ("app.netmirror.newtv".equals(pkg)) return "Netmirror";
+        if ("com.amazon.amazonvideo.livingroom".equals(pkg)) return "Prime Video";
+        if ("in.startv.hotstar".equals(pkg)) return "Jiohotstar";
+        if ("com.google.android.youtube.tv".equals(pkg)) return "YouTube";
+        if ("com.sonyliv".equals(pkg)) return "SonyLIV";
+        if (pkg != null && (pkg.contains("HW2") || pkg.contains("external"))) return "PS5";
+        return fallback;
     }
 
     /** A banner_* drawable bundled with the launcher, or null for none or a name that is not one. */
@@ -432,14 +469,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         card.setLayoutParams(cardLp);
         View name = v.findViewById(R.id.name);
         ViewGroup.MarginLayoutParams nameLp = (ViewGroup.MarginLayoutParams) name.getLayoutParams();
-        nameLp.width = w;
-        nameLp.topMargin = h + Math.round((dockRow ? 7 : 4) * density);
-        if (!dockRow) {
-            // Compact spacing (COMPACT_ITEM_EXTRA_DP): 4dp item padding and a 20dp name instead of 8dp and 22dp.
-            nameLp.height = Math.round(20 * density);
-            int pad = Math.round(4 * density);
-            v.setPadding(v.getPaddingLeft(), pad, v.getPaddingRight(), pad);
-        }
+        nameLp.topMargin = Math.round(8 * density);
         name.setLayoutParams(nameLp);
         // A sideways row would stretch a match_parent item across the whole screen: give it a grid column's width.
         if (singleRow) v.getLayoutParams().width = inner / dockSize;
@@ -472,26 +502,43 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         h.card.setVisibility(View.VISIBLE);
         h.card.setFocusable(true);
-        h.name.setText(e.name);
-        // The dock has no labels, unless always_show_names asks for them (DockDecoration then makes room in the band).
-        // In a single row every tile is the dock's kind: the big title above names it.
-        boolean dockKind = dockRow && (singleRow || position < dockSize);
-        h.name.setVisibility(dockKind && restNameAlpha == 0f ? View.INVISIBLE : View.VISIBLE);
-        boolean focused = h.card.isFocused();   // a rebind after reload() can hit the focused tile
-        h.name.setAlpha(focused ? 1f : restNameAlpha);
-        h.card.setScaleX(focused && animations ? focusScale() : 1f);
-        h.card.setScaleY(focused && animations ? focusScale() : 1f);
-        h.card.setTranslationY(focused && advancedEffects ? -4f * ctx.getResources().getDisplayMetrics().density : 0f);
-        h.card.setTranslationZ(focused && advancedEffects ? 8f * ctx.getResources().getDisplayMetrics().density : 0f);
-        h.banner.setScaleX(focused && advancedEffects ? 1.035f : 1f);
-        h.banner.setScaleY(focused && advancedEffects ? 1.035f : 1f);
-        // A fully opaque banner covers the whole card (centerCrop), so the card's own fill under it is drawn for
-        // nothing on every frame; keep it under banners with transparent parts and under icon tiles.
-        h.card.setBackground(e.banner != null && e.banner.getOpacity() == PixelFormat.OPAQUE ? null : h.cardBackground);
-        if (uniformTiles && e.banner == null) {
-            if (e.backdrop == null) e.backdrop = backdrop(e.icon, ambientColorAt(position));
-            h.card.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, e.backdrop));
+        h.name.setText(e.label);
+        h.name.setVisibility(View.VISIBLE);
+
+        h.card.setBackground(null);
+        h.card.setOutlineProvider(null);
+        h.card.setElevation(0f);
+        h.card.setClipToOutline(false);
+
+        boolean focused = h.card.isFocused();
+        h.name.setAlpha(focused ? 1f : 0f);
+        h.card.setScaleX(focused ? 1.15f : 1f);
+        h.card.setScaleY(focused ? 1.15f : 1f);
+        h.card.setTranslationY(0f);
+        h.card.setTranslationZ(0f);
+        h.banner.setScaleX(1f);
+        h.banner.setScaleY(1f);
+        h.banner.setAlpha(focused ? 1f : 0.75f);
+
+        h.banner.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int wDp, hDp;
+        if ("app.netmirror.newtv".equals(e.pkg)) {
+            wDp = 46; hDp = 78;
+        } else if ("com.amazon.amazonvideo.livingroom".equals(e.pkg)) {
+            wDp = 108; hDp = 52;
+        } else if ("in.startv.hotstar".equals(e.pkg)) {
+            wDp = 70; hDp = 63;
+        } else if ("com.google.android.youtube.tv".equals(e.pkg)) {
+            wDp = 80; hDp = 56;
+        } else if ("com.sonyliv".equals(e.pkg)) {
+            wDp = 96; hDp = 53;
+        } else { // PS5
+            wDp = 90; hDp = 60;
         }
+        float d = ctx.getResources().getDisplayMetrics().density;
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(Math.round(wDp * d), Math.round(hDp * d), android.view.Gravity.CENTER);
+        h.banner.setLayoutParams(blp);
+
         if (e.banner != null) {
             h.banner.setImageDrawable(e.banner);
             h.banner.setVisibility(View.VISIBLE);
@@ -503,7 +550,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             h.icon.setImageDrawable(e.icon);
             h.icon.setVisibility(View.VISIBLE);
             h.label.setText(e.label);
-            h.label.setVisibility(uniformTiles ? View.GONE : View.VISIBLE);
+            h.label.setVisibility(View.GONE);
         }
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
@@ -911,14 +958,9 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             this.overshoot = overshoot;
 
             final float density = v.getResources().getDisplayMetrics().density;
-            card.setOutlineProvider(new ViewOutlineProvider() {
-                @Override
-                public void getOutline(View view, Outline outline) {
-                    // 16dp at the design width, scaled down with the tile so small tiles keep the same shape.
-                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cornerRadius(view.getWidth(), density));
-                }
-            });
-            card.setClipToOutline(true);
+            card.setBackground(null);
+            card.setOutlineProvider(null);
+            card.setClipToOutline(false);
 
             card.setOnKeyListener((view, keyCode, event) -> {
                 if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
@@ -932,7 +974,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 view.animate().cancel();
                 banner.animate().cancel();
                 name.animate().cancel();
-                float scale = 1.08f;
+                float scale = 1.15f;
                 float s = focused ? scale : 1f;
                 view.animate().scaleX(s).scaleY(s)
                         .translationY(0f)
@@ -940,8 +982,12 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                         .setDuration(focused ? 160 : 140)
                         .setInterpolator(new DecelerateInterpolator(1.5f))
                         .start();
-                name.animate().alpha(focused ? 1f : restNameAlpha)
-                        .setDuration(160).start();
+                banner.animate().alpha(focused ? 1.0f : 0.75f)
+                        .setDuration(160)
+                        .start();
+                name.animate().alpha(focused ? 1.0f : 0.0f)
+                        .setDuration(160)
+                        .start();
                 int pos = getBindingAdapterPosition();
                 if (focused && listener != null && pos != RecyclerView.NO_POSITION) {
                     listener.onTileFocused(pos, view);

@@ -12,6 +12,14 @@
         android:layout_height="match_parent"
         android:importantForAccessibility="no" />
 
+    <!-- Soft black bottom gradient so the dock sits on dark -->
+    <View
+        android:id="@+id/wallpaperGradientScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/wallpaper_bottom_gradient"
+        android:importantForAccessibility="no" />
+
     <!-- Cinematic top shelf (cinematic_home): the focused dock app's artwork, a few pixels across and
          stretched over the screen, which softens it like a blur without the cost of one. Hidden otherwise. -->
     <ImageView
@@ -206,25 +214,39 @@
                         android:format12Hour="h:mm"
                         android:format24Hour="HH:mm"
                         android:textColor="#FFFFFFFF"
-                        android:textSize="52sp"
-                        android:fontFamily="@string/font_light"
-                        android:letterSpacing="-0.04"
+                        android:textSize="50sp"
+                        android:fontFamily="@font/outfit_light"
+                        android:letterSpacing="-0.02"
                         android:includeFontPadding="false" />
 
-                    <TextClock
-                        android:id="@+id/ampm"
+                    <!-- Small outline icon and temperature beside the time -->
+                    <LinearLayout
+                        android:id="@+id/weatherBlock"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:layout_gravity="bottom"
-                        android:layout_marginBottom="8dp"
-                        android:format12Hour="a"
-                        android:format24Hour=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="15sp"
-                        android:fontFamily="@string/font_medium"
-                        android:letterSpacing="0.08"
-                        android:textAllCaps="true" />
+                        android:layout_marginStart="20dp"
+                        android:layout_gravity="center_vertical"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/weatherIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginEnd="6dp"
+                            android:tint="#CCFFFFFF"
+                            android:contentDescription="@null" />
+
+                        <TextView
+                            android:id="@+id/weatherTemp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#CCFFFFFF"
+                            android:textSize="22sp"
+                            android:fontFamily="@font/outfit_light"
+                            android:includeFontPadding="false" />
+                    </LinearLayout>
 
                     <View
                         android:id="@+id/clockDivider"
@@ -367,38 +389,69 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- The home row container: single row of main apps centered vertically with More apps button under it -->
+        <!-- The home row container: tagline, soft brand glow, single row of floating white logos, More apps button -->
         <LinearLayout
             android:id="@+id/homeRowContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center"
+            android:gravity="bottom|center_horizontal"
+            android:paddingBottom="16dp"
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/grid"
+            <!-- Short tagline for the focused dock app -->
+            <TextView
+                android:id="@+id/dockTagline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text=""
+                android:textColor="#F0FFFFFF"
+                android:textSize="20sp"
+                android:fontFamily="@font/outfit_light"
+                android:letterSpacing="0.03"
+                android:alpha="0"
+                android:singleLine="true" />
+
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:clipToPadding="false"
                 android:clipChildren="false"
-                android:overScrollMode="never"
-                android:scrollbars="none"
-                android:descendantFocusability="afterDescendants" />
+                android:clipToPadding="false">
+
+                <!-- Soft radial glow behind the focused dock app's logo -->
+                <ImageView
+                    android:id="@+id/dockGlow"
+                    android:layout_width="220dp"
+                    android:layout_height="130dp"
+                    android:layout_gravity="top|start"
+                    android:alpha="0"
+                    android:importantForAccessibility="no" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/grid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:clipToPadding="false"
+                    android:clipChildren="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    android:descendantFocusability="afterDescendants" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/btnMoreApps"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
+                android:layout_marginTop="14dp"
                 android:text="More apps"
                 android:textColor="#B3FFFFFF"
                 android:textSize="15sp"
-                android:fontFamily="@string/font_medium"
+                android:fontFamily="@font/outfit_medium"
                 android:letterSpacing="0.04"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"

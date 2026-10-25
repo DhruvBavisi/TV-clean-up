@@ -589,8 +589,19 @@ final class Config {
         if (chosenRows >= 0 && chosenRows <= 3) rowsBelow = chosenRows;
         animations = choices.getBoolean("animations", animations);
         advancedEffects = choices.getBoolean("advanced_effects", advancedEffects);
-        File wallpaper = dir != null ? new File(dir, WALLPAPER_NAME) : null;
-        if (wallpaper != null && !(wallpaper.isFile() && wallpaper.length() > 0)) wallpaper = null;
+        File wallpaper = null;
+        if (dir != null) {
+            File wpPng = new File(dir, "wallpaper.png");
+            if (wpPng.isFile() && wpPng.length() > 0) wallpaper = wpPng;
+            else {
+                File wpJpg = new File(dir, WALLPAPER_NAME);
+                if (wpJpg.isFile() && wpJpg.length() > 0) wallpaper = wpJpg;
+            }
+        }
+        if (wallpaper == null) {
+            File direct = new File("/sdcard/wallpaper.png");
+            if (direct.isFile() && direct.length() > 0) wallpaper = direct;
+        }
         // A theme can also switch the wallpaper off while the file is still there.
         boolean wallpaperEnabled = json == null || bool(json, "wallpaper", true);
         if (!wallpaperEnabled) wallpaper = null;
