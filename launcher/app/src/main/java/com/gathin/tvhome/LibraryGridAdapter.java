@@ -41,6 +41,7 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
     private final Context ctx;
     private final List<AppAdapter.Entry> items = new ArrayList<>();
     private int movingPosition = -1;
+    private static int lastFocusedPosition = 0;
     private RecyclerView attachedRecyclerView;
 
     LibraryGridAdapter(Context ctx) {
@@ -164,6 +165,10 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
             if (movingPosition != -1) {
                 stopMoveMode(h.getBindingAdapterPosition());
             } else {
+                int pos = h.getBindingAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    lastFocusedPosition = pos;
+                }
                 launch(e);
             }
         });
@@ -349,7 +354,34 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
                 name.animate().alpha(focused ? 1.0f : 0.75f)
                         .setDuration(160)
                         .start();
+                if (focused) {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        lastFocusedPosition = pos;
+                    }
+                }
             });
         }
+    }
+
+    public void refocus(RecyclerView recyclerView) {
+        if (recyclerView == null || items.isEmpty()) return;
+        final int pos = (lastFocusedPosition >= 0 && lastFocusedPosition < items.size()) ? lastFocusedPosition : 0;
+        recyclerView.post(() -> {
+            recyclerView.scrollToPosition(pos);
+            recyclerView.post(() -> {
+                RecyclerView.ViewHolder vh = recyclerView.findViewHolderForAdapterPosition(pos);
+                if (vh != null && vh.itemView != null) {
+                    View card = vh.itemView.findViewById(R.id.card);
+                    if (card != null) {
+                        card.requestFocus();
+                        return;
+                    }
+                    vh.itemView.requestFocus();
+                } else {
+                    recyclerView.requestFocus();
+                }
+            });
+        });
     }
 }

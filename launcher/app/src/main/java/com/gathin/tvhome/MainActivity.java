@@ -359,6 +359,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config show_inputs_pill: false keeps the Inputs pill hidden even when the TV has inputs. */
     private boolean showInputsPill = true;
     private TextView btnWifi;
+    private View wifiBlock;
+    private TextView wifiName;
+    private String currentWifiSsid;
+    private int lastFocusedTopButtonId = 0;
     /** The network pill's icon as last set, so a refresh that changes nothing does not lay the top bar out again. */
     private int wifiIcon;
     /** The pills have been filled in once; later resumes refresh them after the first frame. */
@@ -657,6 +661,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             clockRow.addOnLayoutChangeListener(centerGreeting);
         }
         btnWifi = findViewById(R.id.btnWifi);
+        wifiBlock = findViewById(R.id.wifiBlock);
+        wifiName = findViewById(R.id.wifiName);
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
         raceCalendar = cfg.raceCalendar;
@@ -831,9 +837,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         btnInputs = findViewById(R.id.btnInputs);
         View btnSettings = findViewById(R.id.btnSettings);
-        btnInputs.setOnClickListener(v -> showInputs());
-        btnWifi.setOnClickListener(v -> openNetworkPill());
+        btnInputs.setOnClickListener(v -> {
+            lastFocusedTopButtonId = R.id.btnInputs;
+            showInputs();
+        });
+        btnWifi.setOnClickListener(v -> {
+            lastFocusedTopButtonId = R.id.btnWifi;
+            openNetworkPill();
+        });
         btnWifi.setOnLongClickListener(v -> {
+            lastFocusedTopButtonId = R.id.btnWifi;
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
         });
@@ -843,6 +856,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_home_settings_pill, 0, 0, 0);
         }
         btnSettings.setOnClickListener(v -> {
+            lastFocusedTopButtonId = R.id.btnSettings;
             if (launcherSettingsButton) startActivityForResult(
                     new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
             else open(systemIntent(Settings.ACTION_SETTINGS));
@@ -850,7 +864,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);
-        if (!cfg.showNetworkPill) btnWifi.setVisibility(View.GONE);
+        if (!cfg.showNetworkPill) {
+            btnWifi.setVisibility(View.GONE);
+            if (wifiBlock != null) wifiBlock.setVisibility(View.GONE);
+        }
         showInputsPill = cfg.showInputsPill;
         showInputsMenuRow = cfg.showInputsPill;
         btnLibraryTop = findViewById(R.id.btnLibraryTop);
@@ -933,8 +950,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .setInterpolator(new DecelerateInterpolator())
                     .start();
             if (focused) {
+                lastFocusedTopButtonId = view.getId();
                 if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
                 if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
+            }
+            if (view.getId() == R.id.btnWifi && wifiName != null) {
+                if (focused) {
+                    CharSequence name = currentWifiSsid;
+                    if (TextUtils.isEmpty(name)) name = btnWifi.getContentDescription();
+                    if (TextUtils.isEmpty(name)) name = getString(R.string.wifi);
+                    wifiName.setText(name);
+                    wifiName.setVisibility(View.VISIBLE);
+                    wifiName.setAlpha(0f);
+                    wifiName.animate().alpha(1.0f).setDuration(160).start();
+                } else {
+                    wifiName.animate().alpha(0f).setDuration(120).withEndAction(() -> {
+                        wifiName.setVisibility(View.GONE);
+                    }).start();
+                }
             }
         };
         btnInputs.setOnFocusChangeListener(bareFocus);
@@ -970,6 +1003,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     wallpaperGradientScrim.animate().alpha(focused ? 1.0f : 0.70f).setDuration(200).start();
                 }
                 if (focused) {
+                    lastFocusedTopButtonId = 0;
                     if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
                     if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
                 }
@@ -1147,7 +1181,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
         taglineRotation = (taglineRotation + 1) % 5;
         fetchWeatherIfNeeded();
-        grid.post(() -> focusTile(lastFocused));
+        if (isLibraryOpen) {
+            if (libraryAdapter != null && libraryGrid != null) {
+                libraryAdapter.refocus(libraryGrid);
+            }
+        } else if (lastFocusedTopButtonId != 0) {
+            View topBtn = findViewById(lastFocusedTopButtonId);
+            if (topBtn != null && topBtn.getVisibility() == View.VISIBLE) {
+                topBtn.post(topBtn::requestFocus);
+            } else {
+                grid.post(() -> focusTile(lastFocused));
+            }
+        } else {
+            grid.post(() -> focusTile(lastFocused));
+        }
         switch (tileRefresh.onResume(packagesChangedSinceRebuild())) {
             case REBUILD:
                 tilesReady = false;
@@ -1241,7 +1288,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Capture the app before rebinding can move focus and overwrite its key.
         final String returnKey = lastFocusedKey;
         final int returnSlot = lastFocused;
-        final boolean restoreFocus = appLibrary == null && (animate || grid.hasFocus());
+        final boolean restoreFocus = appLibrary == null && !isLibraryOpen && lastFocusedTopButtonId == 0 && (animate || grid.hasFocus());
         if (restoreFocus) {
             glassShown = false;
             glass.setAlpha(0f);
@@ -1817,6 +1864,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onTileFocused(int position, View card) {
+        lastFocusedTopButtonId = 0;
         lastFocused = position;
         lastFocusedKey = adapter.keyAt(position);
         // Focus restored before the first layout (cold start): the tile has no size yet, and the glass
@@ -2539,7 +2587,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             button.setContentDescription(label);
             Intent target = launch;
             button.setOnClickListener(v -> open(new Intent(target)));
-            bar.addView(button, bar.indexOfChild(btnWifi));
+            View wifiAnchor = findViewById(R.id.wifiBlock) != null ? findViewById(R.id.wifiBlock) : btnWifi;
+            bar.addView(button, bar.indexOfChild(wifiAnchor));
             topAppButtons.add(button);
         }
     }
@@ -2852,8 +2901,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else if (!TextUtils.equals(btnWifi.getText(), text)) {
             btnWifi.setText(text);
         }
+        currentWifiSsid = text;
         btnWifi.setContentDescription(text);
         btnWifi.setText(null);
+        if (wifiName != null && btnWifi.hasFocus()) {
+            wifiName.setText(text);
+        }
         if (festive && diya != null) {
             if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
             diya.setSteady(steady);
