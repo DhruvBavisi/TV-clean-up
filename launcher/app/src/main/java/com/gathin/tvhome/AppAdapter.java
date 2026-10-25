@@ -393,7 +393,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     private String getDockLabel(String pkg, String fallback) {
-        if ("app.netmirror.newtv".equals(pkg)) return "Netmirror";
+        if ("app.netmirror.newtv".equals(pkg)) return "Netflix";
         if ("com.amazon.amazonvideo.livingroom".equals(pkg)) return "Prime Video";
         if ("in.startv.hotstar".equals(pkg)) return "Jiohotstar";
         if ("com.google.android.youtube.tv".equals(pkg)) return "YouTube";
@@ -523,15 +523,15 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         h.banner.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int wDp, hDp;
         if ("app.netmirror.newtv".equals(e.pkg)) {
-            wDp = 46; hDp = 78;
+            wDp = 40; hDp = 68;
         } else if ("com.amazon.amazonvideo.livingroom".equals(e.pkg)) {
             wDp = 108; hDp = 52;
         } else if ("in.startv.hotstar".equals(e.pkg)) {
             wDp = 70; hDp = 63;
         } else if ("com.google.android.youtube.tv".equals(e.pkg)) {
-            wDp = 80; hDp = 56;
+            wDp = 70; hDp = 49;
         } else if ("com.sonyliv".equals(e.pkg)) {
-            wDp = 96; hDp = 53;
+            wDp = 84; hDp = 46;
         } else { // PS5
             wDp = 90; hDp = 60;
         }
