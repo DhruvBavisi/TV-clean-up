@@ -359,7 +359,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config show_inputs_pill: false keeps the Inputs pill hidden even when the TV has inputs. */
     private boolean showInputsPill = true;
     private TextView btnWifi;
-    private View wifiBlock;
     private TextView wifiName;
     private String currentWifiSsid;
     private int lastFocusedTopButtonId = 0;
@@ -661,7 +660,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             clockRow.addOnLayoutChangeListener(centerGreeting);
         }
         btnWifi = findViewById(R.id.btnWifi);
-        wifiBlock = findViewById(R.id.wifiBlock);
         wifiName = findViewById(R.id.wifiName);
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
@@ -866,7 +864,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);
         if (!cfg.showNetworkPill) {
             btnWifi.setVisibility(View.GONE);
-            if (wifiBlock != null) wifiBlock.setVisibility(View.GONE);
         }
         showInputsPill = cfg.showInputsPill;
         showInputsMenuRow = cfg.showInputsPill;
@@ -962,7 +959,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     wifiName.setText(name);
                     wifiName.setVisibility(View.VISIBLE);
                     wifiName.setAlpha(0f);
-                    wifiName.animate().alpha(1.0f).setDuration(160).start();
+                    wifiName.post(() -> {
+                        View tb = findViewById(R.id.topButtons);
+                        float tbX = tb != null ? tb.getX() : 0f;
+                        float wifiCenterX = tbX + btnWifi.getX() + btnWifi.getWidth() / 2f;
+                        wifiName.setX(wifiCenterX - wifiName.getWidth() / 2f);
+                        wifiName.animate().alpha(1.0f).setDuration(160).start();
+                    });
                 } else {
                     wifiName.animate().alpha(0f).setDuration(120).withEndAction(() -> {
                         wifiName.setVisibility(View.GONE);
@@ -2587,7 +2590,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             button.setContentDescription(label);
             Intent target = launch;
             button.setOnClickListener(v -> open(new Intent(target)));
-            View wifiAnchor = findViewById(R.id.wifiBlock) != null ? findViewById(R.id.wifiBlock) : btnWifi;
+            View wifiAnchor = btnWifi;
             bar.addView(button, bar.indexOfChild(wifiAnchor));
             topAppButtons.add(button);
         }
@@ -2906,6 +2909,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnWifi.setText(null);
         if (wifiName != null && btnWifi.hasFocus()) {
             wifiName.setText(text);
+            wifiName.post(() -> {
+                View tb = findViewById(R.id.topButtons);
+                float tbX = tb != null ? tb.getX() : 0f;
+                float wifiCenterX = tbX + btnWifi.getX() + btnWifi.getWidth() / 2f;
+                wifiName.setX(wifiCenterX - wifiName.getWidth() / 2f);
+            });
         }
         if (festive && diya != null) {
             if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
