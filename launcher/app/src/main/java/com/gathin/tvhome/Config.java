@@ -246,6 +246,8 @@ final class Config {
     final boolean singleRow;
     /** With single_row, the band runs behind every app in the row, not only the dock apps (config.xml, dock_band_all). */
     final boolean dockBandAll;
+    /** My Favourites character lineup and scene background (config.xml / theme favourites_lineup). */
+    final boolean favouritesLineup;
 
     private Config(List<String> dockApps, boolean fillDock, List<String> hiddenApps, List<String> libraryApps, String liveTvPackage,
                    String liveTvAction, String liveTvInputId, Map<String, String> launchActions, Map<String, String> appLabels,
@@ -260,7 +262,7 @@ final class Config {
                    List<RaceWeekend.Race> raceCalendar, boolean cinematicHome, boolean ambientGlow, boolean appGlow, boolean fadeRows, int homeIdleClockMinutes,
                    boolean keyFilter, boolean dockGlass, String glowStyle, boolean wallpaperCaptions,
                    boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding, boolean dockBand, boolean cinematicDots, boolean cinematicWhiteFocus, boolean wifiStatusColor, int cinematicScrim, int cinematicArt,
-                   Map<String, Set<String>> wallpaperMoods, boolean gamepadPassthrough, boolean consumeVolumeKeys, boolean powerOnHome, boolean wifiStatusWarnings, List<String> topBarApps, boolean showGreeting, boolean headerWhite, boolean clockWallpaper, int clockWallpaperDim, boolean clockGlow, String glassStyle, boolean singleRow, boolean dockBandAll, boolean lunarDate, int lunarUtcOffset, boolean dateBelowClock) {
+                   Map<String, Set<String>> wallpaperMoods, boolean gamepadPassthrough, boolean consumeVolumeKeys, boolean powerOnHome, boolean wifiStatusWarnings, List<String> topBarApps, boolean showGreeting, boolean headerWhite, boolean clockWallpaper, int clockWallpaperDim, boolean clockGlow, String glassStyle, boolean singleRow, boolean dockBandAll, boolean lunarDate, int lunarUtcOffset, boolean dateBelowClock, boolean favouritesLineup) {
         this.handleViewInputs = handleViewInputs;
         this.tileMenu = tileMenu;
         this.inputKeycodes = inputKeycodes;
@@ -362,6 +364,7 @@ final class Config {
         this.glowStyle = glowStyle(glowStyle);
         this.wallpaperCaptions = wallpaperCaptions;
         this.glassStyle = glassStyle(glassStyle);
+        this.favouritesLineup = favouritesLineup;
     }
 
     /** A known glow_style, or radial (the default) for anything else. */
@@ -475,6 +478,7 @@ final class Config {
         String glassStyle = res.getString(R.string.glass_style);
         boolean singleRow = res.getBoolean(R.bool.single_row);
         boolean dockBandAll = res.getBoolean(R.bool.dock_band_all);
+        boolean favouritesLineup = res.getBoolean(R.bool.favourites_lineup);
         boolean applied = false;
 
         File dir = dir(ctx);
@@ -573,6 +577,7 @@ final class Config {
             clockGlow = bool(json, "clock_glow", clockGlow);
             singleRow = bool(json, "single_row", singleRow);
             dockBandAll = bool(json, "dock_band_all", dockBandAll);
+            favouritesLineup = bool(json, "favourites_lineup", favouritesLineup);
             glowStyle = string(json, "glow_style", glowStyle);
             glassStyle = string(json, "glass_style", glassStyle);
         }
@@ -651,7 +656,7 @@ final class Config {
                 dockBand, cinematicDots, cinematicWhiteFocus, wifiStatusColor, cinematicScrim, cinematicArt, wallpaperMoods, gamepadPassthrough,
                 consumeVolumeKeys, powerOnHome, wifiStatusWarnings, topBarApps, showGreeting, headerWhite, clockWallpaper,
                 Math.max(0, Math.min(90, clockWallpaperDim)), clockGlow, glassStyle, singleRow && dockRow, dockBandAll, lunar, lunarOffset,
-                dateBelowClock);
+                dateBelowClock, favouritesLineup);
     }
 
     /**

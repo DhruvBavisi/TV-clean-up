@@ -1,0 +1,394 @@
+{
+  "spider-man": [
+    {
+      "character": "spider-man",
+      "group": "Tobey Maguire",
+      "title": "Spider-Man",
+      "year_or_season": "2002",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Tobey Maguire",
+      "title": "Spider-Man 2",
+      "year_or_season": "2004",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man-2.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Tobey Maguire",
+      "title": "Spider-Man 3",
+      "year_or_season": "2007",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man-3.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Andrew Garfield",
+      "title": "The Amazing Spider-Man",
+      "year_or_season": "2012",
+      "app_package": "",
+      "link": "",
+      "poster_file": "the-amazing-spider-man.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Andrew Garfield",
+      "title": "The Amazing Spider-Man 2",
+      "year_or_season": "2014",
+      "app_package": "",
+      "link": "",
+      "poster_file": "the-amazing-spider-man-2.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Tom Holland",
+      "title": "Spider-Man: Homecoming",
+      "year_or_season": "2017",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man-homecoming.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Tom Holland",
+      "title": "Spider-Man: Far From Home",
+      "year_or_season": "2019",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man-far-from-home.jpg"
+    },
+    {
+      "character": "spider-man",
+      "group": "Tom Holland",
+      "title": "Spider-Man: No Way Home",
+      "year_or_season": "2021",
+      "app_package": "",
+      "link": "",
+      "poster_file": "spider-man-no-way-home.jpg"
+    }
+  ],
+  "jack-sparrow": [
+    {
+      "character": "jack-sparrow",
+      "group": "",
+      "title": "Pirates of the Caribbean: The Curse of the Black Pearl",
+      "year_or_season": "2003",
+      "app_package": "",
+      "link": "",
+      "poster_file": "curse-of-the-black-pearl.jpg"
+    },
+    {
+      "character": "jack-sparrow",
+      "group": "",
+      "title": "Pirates of the Caribbean: Dead Man's Chest",
+      "year_or_season": "2006",
+      "app_package": "",
+      "link": "",
+      "poster_file": "dead-mans-chest.jpg"
+    },
+    {
+      "character": "jack-sparrow",
+      "group": "",
+      "title": "Pirates of the Caribbean: At World's End",
+      "year_or_season": "2007",
+      "app_package": "",
+      "link": "",
+      "poster_file": "at-worlds-end.jpg"
+    },
+    {
+      "character": "jack-sparrow",
+      "group": "",
+      "title": "Pirates of the Caribbean: On Stranger Tides",
+      "year_or_season": "2011",
+      "app_package": "",
+      "link": "",
+      "poster_file": "on-stranger-tides.jpg"
+    },
+    {
+      "character": "jack-sparrow",
+      "group": "",
+      "title": "Pirates of the Caribbean: Dead Men Tell No Tales",
+      "year_or_season": "2017",
+      "app_package": "",
+      "link": "",
+      "poster_file": "dead-men-tell-no-tales.jpg"
+    }
+  ],
+  "walter-white": [
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "Breaking Bad Season 1",
+      "year_or_season": "Season 1",
+      "app_package": "",
+      "link": "",
+      "poster_file": "breaking-bad-s1.jpg"
+    },
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "Breaking Bad Season 2",
+      "year_or_season": "Season 2",
+      "app_package": "",
+      "link": "",
+      "poster_file": "breaking-bad-s2.jpg"
+    },
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "Breaking Bad Season 3",
+      "year_or_season": "Season 3",
+      "app_package": "",
+      "link": "",
+      "poster_file": "breaking-bad-s3.jpg"
+    },
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "Breaking Bad Season 4",
+      "year_or_season": "Season 4",
+      "app_package": "",
+      "link": "",
+      "poster_file": "breaking-bad-s4.jpg"
+    },
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "Breaking Bad Season 5",
+      "year_or_season": "Season 5",
+      "app_package": "",
+      "link": "",
+      "poster_file": "breaking-bad-s5.jpg"
+    },
+    {
+      "character": "walter-white",
+      "group": "",
+      "title": "El Camino: A Breaking Bad Movie",
+      "year_or_season": "2019",
+      "app_package": "",
+      "link": "",
+      "poster_file": "el-camino.jpg"
+    }
+  ],
+  "saul-goodman": [
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 1",
+      "year_or_season": "Season 1",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s1.jpg"
+    },
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 2",
+      "year_or_season": "Season 2",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s2.jpg"
+    },
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 3",
+      "year_or_season": "Season 3",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s3.jpg"
+    },
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 4",
+      "year_or_season": "Season 4",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s4.jpg"
+    },
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 5",
+      "year_or_season": "Season 5",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s5.jpg"
+    },
+    {
+      "character": "saul-goodman",
+      "group": "",
+      "title": "Better Call Saul Season 6",
+      "year_or_season": "Season 6",
+      "app_package": "",
+      "link": "",
+      "poster_file": "better-call-saul-s6.jpg"
+    }
+  ],
+  "tony-stark": [
+    {
+      "character": "tony-stark",
+      "group": "",
+      "title": "Iron Man",
+      "year_or_season": "2008",
+      "app_package": "",
+      "link": "",
+      "poster_file": "iron-man.jpg"
+    },
+    {
+      "character": "tony-stark",
+      "group": "",
+      "title": "Iron Man 2",
+      "year_or_season": "2010",
+      "app_package": "",
+      "link": "",
+      "poster_file": "iron-man-2.jpg"
+    },
+    {
+      "character": "tony-stark",
+      "group": "",
+      "title": "Iron Man 3",
+      "year_or_season": "2013",
+      "app_package": "",
+      "link": "",
+      "poster_file": "iron-man-3.jpg"
+    }
+  ],
+  "batman": [
+    {
+      "character": "batman",
+      "group": "Michael Keaton",
+      "title": "Batman",
+      "year_or_season": "1989",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-1989.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Michael Keaton",
+      "title": "Batman Returns",
+      "year_or_season": "1992",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-returns.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Val Kilmer",
+      "title": "Batman Forever",
+      "year_or_season": "1995",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-forever.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "George Clooney",
+      "title": "Batman & Robin",
+      "year_or_season": "1997",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-and-robin.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Christian Bale",
+      "title": "Batman Begins",
+      "year_or_season": "2005",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-begins.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Christian Bale",
+      "title": "The Dark Knight",
+      "year_or_season": "2008",
+      "app_package": "",
+      "link": "",
+      "poster_file": "the-dark-knight.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Christian Bale",
+      "title": "The Dark Knight Rises",
+      "year_or_season": "2012",
+      "app_package": "",
+      "link": "",
+      "poster_file": "the-dark-knight-rises.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Ben Affleck",
+      "title": "Batman v Superman: Dawn of Justice",
+      "year_or_season": "2016",
+      "app_package": "",
+      "link": "",
+      "poster_file": "batman-v-superman.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Ben Affleck",
+      "title": "Justice League",
+      "year_or_season": "2017",
+      "app_package": "",
+      "link": "",
+      "poster_file": "justice-league.jpg"
+    },
+    {
+      "character": "batman",
+      "group": "Robert Pattinson",
+      "title": "The Batman",
+      "year_or_season": "2022",
+      "app_package": "",
+      "link": "",
+      "poster_file": "the-batman.jpg"
+    }
+  ],
+  "john-wick": [
+    {
+      "character": "john-wick",
+      "group": "",
+      "title": "John Wick",
+      "year_or_season": "2014",
+      "app_package": "",
+      "link": "",
+      "poster_file": "john-wick.jpg"
+    },
+    {
+      "character": "john-wick",
+      "group": "",
+      "title": "John Wick: Chapter 2",
+      "year_or_season": "2017",
+      "app_package": "",
+      "link": "",
+      "poster_file": "john-wick-2.jpg"
+    },
+    {
+      "character": "john-wick",
+      "group": "",
+      "title": "John Wick: Chapter 3 - Parabellum",
+      "year_or_season": "2019",
+      "app_package": "",
+      "link": "",
+      "poster_file": "john-wick-3.jpg"
+    },
+    {
+      "character": "john-wick",
+      "group": "",
+      "title": "John Wick: Chapter 4",
+      "year_or_season": "2023",
+      "app_package": "",
+      "link": "",
+      "poster_file": "john-wick-4.jpg"
+    }
+  ]
+}

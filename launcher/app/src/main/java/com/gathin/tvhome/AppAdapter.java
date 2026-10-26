@@ -380,7 +380,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         notifyDataSetChanged();
     }
 
-    private Drawable getDockLogo(String pkg) {
+    static Drawable getDockLogo(Context ctx, String pkg) {
         if ("app.netmirror.newtv".equals(pkg)) return ctx.getDrawable(R.drawable.logo_netmirror);
         if ("com.amazon.amazonvideo.livingroom".equals(pkg)) return ctx.getDrawable(R.drawable.logo_prime);
         if ("in.startv.hotstar".equals(pkg)) return ctx.getDrawable(R.drawable.logo_jiohotstar);
@@ -392,7 +392,11 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         return null;
     }
 
-    private String getDockLabel(String pkg, String fallback) {
+    private Drawable getDockLogo(String pkg) {
+        return getDockLogo(ctx, pkg);
+    }
+
+    static String getDockLabel(String pkg, String fallback) {
         if ("app.netmirror.newtv".equals(pkg)) return "Netflix";
         if ("com.amazon.amazonvideo.livingroom".equals(pkg)) return "Prime Video";
         if ("in.startv.hotstar".equals(pkg)) return "Jiohotstar";

@@ -39,6 +39,16 @@
         android:visibility="gone"
         android:alpha="0" />
 
+    <!-- Darkened scene background for the selected Favourites character -->
+    <ImageView
+        android:id="@+id/favSceneBackdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
     <!-- Race-weekend panel (a theme's race_calendar, see RaceWeekend): in the free space under the clock,
          shown only from shortly before a weekend's first session until the race is over. Updated once a
          minute with the clock, never animated. -->
@@ -164,6 +174,13 @@
         android:layout_gravity="top|start"
         android:alpha="0"
         android:importantForAccessibility="no" />
+
+    <FrameLayout
+        android:id="@+id/homeVerticalScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
     <LinearLayout
         android:id="@+id/mainContent"
@@ -504,6 +521,20 @@
                 android:clickable="true" />
         </LinearLayout>
     </LinearLayout>
+
+        <com.gathin.tvhome.FavouritesLineupView
+            android:id="@+id/favouritesLineup"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:translationY="1080px"
+            android:visibility="gone" />
+
+        <com.gathin.tvhome.FavouritesTitlePageView
+            android:id="@+id/favouritesTitlePage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <!-- Full-screen apps library overlay on the same background -->
     <LinearLayout

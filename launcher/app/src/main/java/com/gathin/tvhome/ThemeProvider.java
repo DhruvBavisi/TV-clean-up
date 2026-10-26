@@ -50,11 +50,27 @@ public class ThemeProvider extends ContentProvider {
             if (images != null) for (File f : images) if (f.delete()) n++;
             return n;
         }
+        if (dir != null && ThemeFiles.isFavourites(uri.getPathSegments())) {
+            return deleteRecursively(new File(dir, ThemeFiles.FAVOURITES));
+        }
         try {
             return file(uri).delete() ? 1 : 0;
         } catch (FileNotFoundException e) {
             return 0;
         }
+    }
+
+    private static int deleteRecursively(File f) {
+        if (f == null || !f.exists()) return 0;
+        int count = 0;
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                count += deleteRecursively(child);
+            }
+        }
+        if (f.delete()) count++;
+        return count;
     }
 
     @Override public boolean onCreate() { return true; }

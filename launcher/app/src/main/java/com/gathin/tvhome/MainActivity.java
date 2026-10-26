@@ -18,6 +18,7 @@ import android.content.pm.ChangedPackages;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -251,6 +252,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView dockTagline;
     private ImageView dockGlow;
     private View wallpaperGradientScrim;
+    private View homeVerticalScroll;
+    private FavouritesLineupView favouritesLineup;
+    private FavouritesTitlePageView favouritesTitlePage;
+    private ImageView favSceneBackdrop;
+    private boolean isFavouritesInFocus = false;
+    public static long lastTitlePageCloseTime = 0L;
+    private final Map<String, Bitmap> sceneCache = new HashMap<>();
+    private final Map<String, Long> sceneMtime = new HashMap<>();
     private View weatherBlock;
     private ImageView weatherIcon;
     private TextView weatherTemp;
@@ -1035,6 +1044,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (cfg.favouritesLineup && favouritesLineup != null) {
+                        scrollToFavourites();
+                        return true;
+                    }
                     return true;
                 }
                 return false;
@@ -1042,6 +1055,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
 
         libraryOverlay = findViewById(R.id.libraryOverlay);
+        homeVerticalScroll = findViewById(R.id.homeVerticalScroll);
+        favouritesLineup = findViewById(R.id.favouritesLineup);
+        favouritesTitlePage = findViewById(R.id.favouritesTitlePage);
+        favSceneBackdrop = findViewById(R.id.favSceneBackdrop);
+        if (cfg.favouritesLineup && favouritesLineup != null) {
+            favouritesLineup.setVisibility(View.VISIBLE);
+            setupFavourites();
+        }
         libraryGrid = findViewById(R.id.libraryGrid);
         if (libraryGrid != null) {
             libraryGrid.setLayoutManager(new GridLayoutManager(this, 6));
@@ -1142,6 +1163,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+
+        if (isFavouritesInFocus) {
+            returnToDock();
+        }
         if (openLauncherSettingsIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
@@ -1405,6 +1430,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onPause() {
         super.onPause();
         root.removeCallbacks(showIdleClock);
+        if (isFavouritesInFocus) {
+            returnToDock();
+        }
+        for (Bitmap b : sceneCache.values()) {
+            if (b != null && !b.isRecycled()) b.recycle();
+        }
+        sceneCache.clear();
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
         stopAmbientAnimation();
@@ -1511,8 +1543,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public boolean dispatchKeyEvent(KeyEvent event) {
         restartIdleClock();
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
+            if (favouritesTitlePage != null && favouritesTitlePage.getVisibility() == View.VISIBLE) {
+                closeFavouritesTitlePage();
+                return true;
+            }
+            if (SystemClock.uptimeMillis() - lastTitlePageCloseTime < 450) {
+                return true;
+            }
             if (isLibraryOpen) {
                 closeLibraryOverlay();
+                return true;
+            }
+            if (isFavouritesInFocus) {
+                returnToDock();
                 return true;
             }
         }
@@ -1843,11 +1886,192 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onBackPressed() {
+        if (favouritesTitlePage != null && favouritesTitlePage.getVisibility() == View.VISIBLE) {
+            closeFavouritesTitlePage();
+            return;
+        }
+        if (SystemClock.uptimeMillis() - lastTitlePageCloseTime < 450) {
+            return;
+        }
         if (isLibraryOpen) {
             closeLibraryOverlay();
             return;
         }
+        if (isFavouritesInFocus) {
+            returnToDock();
+            return;
+        }
         // Home screen: Back goes nowhere.
+    }
+
+    private void setupFavourites() {
+        if (favouritesLineup == null) return;
+        favouritesLineup.setListener(new FavouritesLineupView.OnSelectionChangedListener() {
+            @Override
+            public void onCharacterSelected(FavouritesLineupView.Character character) {
+                updateSceneBackdrop(character);
+            }
+
+            @Override
+            public void onNobodySelected() {
+                hideSceneBackdrop();
+            }
+
+            @Override
+            public void onUpToDock() {
+                returnToDock();
+            }
+
+            @Override
+            public void onCharacterActivated(FavouritesLineupView.Character character) {
+                openFavouritesTitlePage(character);
+            }
+        });
+        if (favouritesTitlePage != null) {
+            favouritesTitlePage.setOnBackListener(this::closeFavouritesTitlePage);
+        }
+    }
+
+    private void openFavouritesTitlePage(FavouritesLineupView.Character character) {
+        if (favouritesTitlePage == null || character == null) return;
+        favouritesTitlePage.showForCharacter(character);
+    }
+
+    private void closeFavouritesTitlePage() {
+        if (favouritesTitlePage == null) return;
+        lastTitlePageCloseTime = SystemClock.uptimeMillis();
+        favouritesTitlePage.close();
+        isFavouritesInFocus = true;
+        if (favouritesLineup != null) {
+            favouritesLineup.setVisibility(View.VISIBLE);
+            favouritesLineup.setTranslationY(0f);
+            favouritesLineup.requestFocus();
+            FavouritesLineupView.Character selected = favouritesLineup.getSelectedCharacter();
+            if (selected != null) {
+                updateSceneBackdrop(selected);
+            }
+        }
+    }
+
+    private void updateSceneBackdrop(FavouritesLineupView.Character selected) {
+        if (favSceneBackdrop == null || selected == null) return;
+        File dir = Config.dir(this);
+        if (dir == null) return;
+
+        Set<String> needed = new HashSet<>();
+        needed.add(selected.sceneFileName);
+
+        if (!selected.isFrontRow) {
+            int idx = -1;
+            for (int i = 0; i < favouritesLineup.backRow.length; i++) {
+                if (favouritesLineup.backRow[i] == selected) { idx = i; break; }
+            }
+            if (idx > 0) needed.add(favouritesLineup.backRow[idx - 1].sceneFileName);
+            if (idx >= 0 && idx < favouritesLineup.backRow.length - 1) needed.add(favouritesLineup.backRow[idx + 1].sceneFileName);
+        } else {
+            int idx = -1;
+            for (int i = 0; i < favouritesLineup.frontRow.length; i++) {
+                if (favouritesLineup.frontRow[i] == selected) { idx = i; break; }
+            }
+            if (idx > 0) needed.add(favouritesLineup.frontRow[idx - 1].sceneFileName);
+            if (idx >= 0 && idx < favouritesLineup.frontRow.length - 1) needed.add(favouritesLineup.frontRow[idx + 1].sceneFileName);
+        }
+
+        sceneCache.keySet().removeIf(key -> {
+            if (!needed.contains(key)) {
+                Bitmap b = sceneCache.get(key);
+                if (b != null && !b.isRecycled()) b.recycle();
+                sceneMtime.remove(key);
+                return true;
+            }
+            return false;
+        });
+
+        for (String file : needed) {
+            File sf = new File(dir, "favourites/scenes/" + file);
+            long mtime = sf.exists() ? sf.lastModified() : 0L;
+            Long cachedMtime = sceneMtime.get(file);
+            if (!sceneCache.containsKey(file) || cachedMtime == null || cachedMtime != mtime) {
+                if (sf.exists()) {
+                    Bitmap old = sceneCache.get(file);
+                    if (old != null && !old.isRecycled()) old.recycle();
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inPreferredConfig = Bitmap.Config.RGB_565;
+                    Bitmap bmp = BitmapFactory.decodeFile(sf.getAbsolutePath(), opts);
+                    if (bmp != null) {
+                        sceneCache.put(file, bmp);
+                        sceneMtime.put(file, mtime);
+                    }
+                }
+            }
+        }
+
+        Bitmap currentScene = sceneCache.get(selected.sceneFileName);
+        if (currentScene != null) {
+            favSceneBackdrop.setImageBitmap(currentScene);
+            if (favSceneBackdrop.getVisibility() != View.VISIBLE) {
+                favSceneBackdrop.setVisibility(View.VISIBLE);
+                favSceneBackdrop.setAlpha(0f);
+                favSceneBackdrop.animate().alpha(1f).setDuration(250).start();
+            } else {
+                favSceneBackdrop.setAlpha(1f);
+            }
+        }
+    }
+
+    private void hideSceneBackdrop() {
+        if (favSceneBackdrop != null && favSceneBackdrop.getVisibility() == View.VISIBLE) {
+            favSceneBackdrop.animate().alpha(0f).setDuration(250).withEndAction(() -> {
+                favSceneBackdrop.setVisibility(View.GONE);
+                favSceneBackdrop.setImageBitmap(null);
+            }).start();
+        }
+    }
+
+    private void scrollToFavourites() {
+        isFavouritesInFocus = true;
+        hideHero();
+        hideGlass();
+        if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
+        if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
+        if (wallpaperGradientScrim != null) wallpaperGradientScrim.animate().alpha(0f).setDuration(200).start();
+        int scrollH = mainContent != null && mainContent.getHeight() > 0 ? mainContent.getHeight() : 1080;
+        if (mainContent != null) {
+            mainContent.animate().translationY(-scrollH).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+        }
+        if (favouritesLineup != null) {
+            favouritesLineup.setVisibility(View.VISIBLE);
+            favouritesLineup.animate().translationY(0f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+            favouritesLineup.requestFocus();
+            favouritesLineup.selectMiddleBackRow();
+        }
+    }
+
+    private void returnToDock() {
+        if (favouritesTitlePage != null && favouritesTitlePage.getVisibility() == View.VISIBLE) {
+            favouritesTitlePage.close();
+        }
+        isFavouritesInFocus = false;
+        hideSceneBackdrop();
+        int scrollH = mainContent != null && mainContent.getHeight() > 0 ? mainContent.getHeight() : 1080;
+        if (mainContent != null) {
+            mainContent.animate().translationY(0f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+        }
+        if (favouritesLineup != null) {
+            favouritesLineup.animate().translationY(scrollH).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+        }
+        if (btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
+            btnMoreApps.requestFocus();
+        } else if (grid != null) {
+            grid.requestFocus();
+        }
+        if (wallpaperGradientScrim != null) {
+            wallpaperGradientScrim.animate().alpha(0.70f).setDuration(200).start();
+        }
     }
 
     // ---- glass highlight -------------------------------------------------------------------------
