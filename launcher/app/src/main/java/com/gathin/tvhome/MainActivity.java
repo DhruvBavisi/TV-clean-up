@@ -952,6 +952,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (dockGlow != null) dockGlow.animate().alpha(0f).setDuration(160).start();
             }
             if (view.getId() == R.id.btnWifi && wifiName != null) {
+                wifiName.animate().cancel();
                 if (focused) {
                     CharSequence name = currentWifiSsid;
                     if (TextUtils.isEmpty(name)) name = btnWifi.getContentDescription();
@@ -960,6 +961,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     wifiName.setVisibility(View.VISIBLE);
                     wifiName.setAlpha(0f);
                     wifiName.post(() -> {
+                        if (!btnWifi.isFocused()) {
+                            wifiName.animate().cancel();
+                            wifiName.setVisibility(View.GONE);
+                            return;
+                        }
                         View tb = findViewById(R.id.topButtons);
                         float tbX = tb != null ? tb.getX() : 0f;
                         float wifiCenterX = tbX + btnWifi.getX() + btnWifi.getWidth() / 2f;
@@ -1179,6 +1185,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (mainContent != null && !isLibraryOpen) {
             mainContent.setAlpha(1f);
             mainContent.setVisibility(View.VISIBLE);
+        }
+        if (wifiName != null && (btnWifi == null || !btnWifi.isFocused())) {
+            wifiName.animate().cancel();
+            wifiName.setVisibility(View.GONE);
         }
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
@@ -2907,14 +2917,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         currentWifiSsid = text;
         btnWifi.setContentDescription(text);
         btnWifi.setText(null);
-        if (wifiName != null && btnWifi.hasFocus()) {
-            wifiName.setText(text);
-            wifiName.post(() -> {
-                View tb = findViewById(R.id.topButtons);
-                float tbX = tb != null ? tb.getX() : 0f;
-                float wifiCenterX = tbX + btnWifi.getX() + btnWifi.getWidth() / 2f;
-                wifiName.setX(wifiCenterX - wifiName.getWidth() / 2f);
-            });
+        if (wifiName != null) {
+            if (btnWifi.isFocused()) {
+                wifiName.setText(text);
+                wifiName.post(() -> {
+                    if (!btnWifi.isFocused()) {
+                        wifiName.setVisibility(View.GONE);
+                        return;
+                    }
+                    View tb = findViewById(R.id.topButtons);
+                    float tbX = tb != null ? tb.getX() : 0f;
+                    float wifiCenterX = tbX + btnWifi.getX() + btnWifi.getWidth() / 2f;
+                    wifiName.setX(wifiCenterX - wifiName.getWidth() / 2f);
+                });
+            } else {
+                wifiName.animate().cancel();
+                wifiName.setVisibility(View.GONE);
+            }
         }
         if (festive && diya != null) {
             if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
