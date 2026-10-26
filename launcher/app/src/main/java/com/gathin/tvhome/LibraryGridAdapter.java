@@ -8,6 +8,7 @@ import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -43,6 +44,7 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
     private final Context ctx;
     private final List<AppAdapter.Entry> items = new ArrayList<>();
     private int movingPosition = -1;
+    private long lastMoveTime = 0;
     private static int lastFocusedPosition = 0;
     private RecyclerView attachedRecyclerView;
 
@@ -211,6 +213,13 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
                 }
 
                 if (target != -1 && target != pos) {
+                    long now = SystemClock.uptimeMillis();
+                    long minInterval = (event.getRepeatCount() > 0) ? 260L : 180L;
+                    if (now - lastMoveTime < minInterval) {
+                        return true;
+                    }
+                    lastMoveTime = now;
+
                     AppAdapter.Entry item = items.remove(pos);
                     items.add(target, item);
                     movingPosition = target;
@@ -315,13 +324,14 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
 
     private void startMoveMode(int position) {
         movingPosition = position;
+        lastMoveTime = SystemClock.uptimeMillis();
         if (attachedRecyclerView != null) {
             RecyclerView.ItemAnimator animator = attachedRecyclerView.getItemAnimator();
             if (animator instanceof SimpleItemAnimator) {
                 ((SimpleItemAnimator) animator).setSupportsChangeAnimations(false);
             }
             if (animator != null) {
-                animator.setMoveDuration(80);
+                animator.setMoveDuration(180);
             }
             RecyclerView.ViewHolder vh = attachedRecyclerView.findViewHolderForAdapterPosition(position);
             if (vh instanceof Holder) {
