@@ -9,6 +9,7 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.provider.Settings;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -23,6 +24,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.SimpleItemAnimator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -158,12 +160,16 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
             if (!h.card.isFocused()) {
                 h.card.setScaleX(1.0f);
                 h.card.setScaleY(1.0f);
+            } else {
+                h.card.setScaleX(1.08f);
+                h.card.setScaleY(1.08f);
+                h.card.setTranslationZ(6f * density);
             }
         }
 
         h.card.setOnClickListener(v -> {
             if (movingPosition != -1) {
-                stopMoveMode(h.getBindingAdapterPosition());
+                stopMoveMode(movingPosition);
             } else {
                 int pos = h.getBindingAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
@@ -185,10 +191,10 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
 
         h.card.setOnKeyListener((view, keyCode, event) -> {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-            int pos = h.getBindingAdapterPosition();
-            if (pos == RecyclerView.NO_POSITION) return false;
+            int pos = (movingPosition != -1) ? movingPosition : h.getBindingAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION || pos < 0 || pos >= items.size()) return false;
 
-            if (movingPosition == pos) {
+            if (movingPosition != -1) {
                 int target = -1;
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && pos > 0) {
                     target = pos - 1;
@@ -204,21 +210,15 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
                     return true;
                 }
 
-                if (target != -1) {
+                if (target != -1 && target != pos) {
                     AppAdapter.Entry item = items.remove(pos);
                     items.add(target, item);
                     movingPosition = target;
                     notifyItemMoved(pos, target);
                     if (attachedRecyclerView != null) {
-                        final int focusTarget = target;
-                        attachedRecyclerView.post(() -> {
-                            RecyclerView.ViewHolder vh = attachedRecyclerView.findViewHolderForAdapterPosition(focusTarget);
-                            if (vh != null && vh.itemView != null) {
-                                View targetCard = vh.itemView.findViewById(R.id.card);
-                                if (targetCard != null) targetCard.requestFocus();
-                            }
-                        });
+                        attachedRecyclerView.scrollToPosition(target);
                     }
+                    view.requestFocus();
                     return true;
                 }
                 return true;
@@ -270,22 +270,107 @@ class LibraryGridAdapter extends RecyclerView.Adapter<LibraryGridAdapter.Holder>
         });
         rows.addView(rowSettings);
 
+        int[] location = new int[2];
+        anchor.getLocationOnScreen(location);
+        int anchorX = location[0];
+        int anchorY = location[1];
+        int anchorH = anchor.getHeight();
+        int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        popup.showAsDropDown(anchor, 0, (int) (6 * density));
+        int popupH = panel.getMeasuredHeight();
+        int popupW = (int) (220 * density);
+
+        int margin = Math.round(6 * density);
+        int edgeMargin = Math.round(20 * density);
+
+        int x = anchorX;
+        if (x + popupW > screenW - edgeMargin) {
+            x = screenW - popupW - edgeMargin;
+        }
+        if (x < edgeMargin) {
+            x = edgeMargin;
+        }
+
+        int y;
+        if (anchorY + anchorH + popupH + margin > screenH - edgeMargin) {
+            // Last row / bottom apps: open ABOVE the card so it never overflows off-screen!
+            y = anchorY - popupH - margin;
+        } else {
+            // Open below the card
+            y = anchorY + anchorH + margin;
+        }
+
+        if (y + popupH > screenH - Math.round(10 * density)) {
+            y = screenH - popupH - Math.round(10 * density);
+        }
+        if (y < Math.round(10 * density)) {
+            y = Math.round(10 * density);
+        }
+
+        popup.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y);
         rowMove.requestFocus();
     }
 
     private void startMoveMode(int position) {
         movingPosition = position;
+        if (attachedRecyclerView != null) {
+            RecyclerView.ItemAnimator animator = attachedRecyclerView.getItemAnimator();
+            if (animator instanceof SimpleItemAnimator) {
+                ((SimpleItemAnimator) animator).setSupportsChangeAnimations(false);
+            }
+            if (animator != null) {
+                animator.setMoveDuration(80);
+            }
+            RecyclerView.ViewHolder vh = attachedRecyclerView.findViewHolderForAdapterPosition(position);
+            if (vh instanceof Holder) {
+                Holder h = (Holder) vh;
+                float density = h.card.getResources().getDisplayMetrics().density;
+                h.card.animate().cancel();
+                h.name.animate().cancel();
+                h.card.animate()
+                        .scaleX(1.15f)
+                        .scaleY(1.15f)
+                        .translationZ(18f * density)
+                        .setDuration(160)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .start();
+                h.name.animate().alpha(1.0f).setDuration(160).start();
+                h.card.requestFocus();
+                return;
+            }
+        }
         notifyItemChanged(position);
-        Toast.makeText(ctx, "Move with arrows, press OK to place", Toast.LENGTH_SHORT).show();
     }
 
     private void stopMoveMode(int finalPos) {
+        int oldPos = movingPosition;
         movingPosition = -1;
         saveCustomOrder();
-        notifyDataSetChanged();
-        Toast.makeText(ctx, "Position saved", Toast.LENGTH_SHORT).show();
+        if (attachedRecyclerView != null) {
+            RecyclerView.ItemAnimator animator = attachedRecyclerView.getItemAnimator();
+            if (animator != null) {
+                animator.setMoveDuration(250);
+            }
+            int posToRestore = (finalPos >= 0 && finalPos < items.size()) ? finalPos : oldPos;
+            RecyclerView.ViewHolder vh = attachedRecyclerView.findViewHolderForAdapterPosition(posToRestore);
+            if (vh instanceof Holder) {
+                Holder h = (Holder) vh;
+                float density = h.card.getResources().getDisplayMetrics().density;
+                h.card.animate().cancel();
+                h.name.animate().cancel();
+                h.card.animate()
+                        .scaleX(1.08f)
+                        .scaleY(1.08f)
+                        .translationZ(6f * density)
+                        .setDuration(160)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .start();
+                h.name.animate().alpha(1.0f).setDuration(160).start();
+                h.card.requestFocus();
+            }
+        }
     }
 
     private void openSettings(AppAdapter.Entry e) {
