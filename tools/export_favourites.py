@@ -158,12 +158,12 @@ for char_id, scene_filename in scene_map.items():
         # Convert to RGB, crop/scale to exactly 1920x1080
         im = ImageOps.fit(im.convert("RGB"), (1920, 1080), method=Image.Resampling.LANCZOS)
         
-        # 1. Mute color saturation so the scene retains a subtle amount of its own color (~38% saturation)
+        # 1. Pure monochrome / greyscale (0.0 saturation)
         color_enhancer = ImageEnhance.Color(im)
-        im_colored = color_enhancer.enhance(0.38)
+        im_mono = color_enhancer.enhance(0.0)
         
         # 2. Darken (reduce brightness to ~0.40 so it stays ambient behind the characters)
-        darkener = ImageEnhance.Brightness(im_colored)
+        darkener = ImageEnhance.Brightness(im_mono)
         im_dark = darkener.enhance(0.40)
         
         # 3. Apply subtle contrast boost for crispness

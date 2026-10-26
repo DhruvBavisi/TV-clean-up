@@ -9,6 +9,7 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -111,14 +112,26 @@ public class FavouritesLineupView extends View {
     // Spider-Sense effect state
     private boolean spiderSenseActive = false;
     private long spiderSenseStart = 0;
-    private static final int SPIDER_THUD_MS = 150;
-    private static final int SPIDER_FADE_MS = 700;
-    private static class TingleLine {
-        float startX, startY, endX, endY;
-        int color;
+    private static final int SPIDER_THUD_MS = 180;
+    private static final int SPIDER_FADE_MS = 5000;
+    private static class TingleCurve {
+        final Path path = new Path();
+        float angle;
+        float rStart;
+        float length;
+        float amp;
+        float waves;
+        float waveSpeed;
+        float phaseOffset;
         long delayMs;
     }
-    private TingleLine[] tingleLines;
+    private static final float[] TINGLE_ANGLES = new float[] {
+            -165f, -140f, -105f, -80f, -55f, -30f, -5f, 20f
+    };
+    private static final float[] TINGLE_RADII = new float[] {
+            92f, 104f, 111f, 112f, 107f, 99f, 87f, 87f
+    };
+    private TingleCurve[] tingleCurves;
 
     public FavouritesLineupView(Context context) {
         this(context, null);
@@ -141,7 +154,7 @@ public class FavouritesLineupView extends View {
 
         spiderPaint.setStyle(Paint.Style.STROKE);
         spiderPaint.setStrokeCap(Paint.Cap.ROUND);
-        spiderPaint.setStrokeWidth(4.5f);
+        spiderPaint.setStrokeJoin(Paint.Join.ROUND);
 
         Shader fadeShader = new LinearGradient(0, 840, 0, 1080, Color.TRANSPARENT, Color.BLACK, Shader.TileMode.CLAMP);
         fadePaint.setShader(fadeShader);
@@ -198,6 +211,7 @@ public class FavouritesLineupView extends View {
     }
 
     public void selectCharacter(int row, int col) {
+        if (this.selectedRow == row && this.selectedCol == col) return;
         this.selectedRow = row;
         this.selectedCol = col;
         Character selected = getSelectedCharacter();
@@ -215,33 +229,43 @@ public class FavouritesLineupView extends View {
     private void triggerSpiderSense() {
         spiderSenseActive = true;
         spiderSenseStart = SystemClock.uptimeMillis();
-        int count = 8 + random.nextInt(5); // 8 to 12
-        tingleLines = new TingleLine[count];
+        int count = TINGLE_ANGLES.length;
+        if (tingleCurves == null || tingleCurves.length != count) {
+            tingleCurves = new TingleCurve[count];
+            for (int i = 0; i < count; i++) {
+                tingleCurves[i] = new TingleCurve();
+            }
+        }
 
         Character sm = null;
         for (Character c : backRow) {
             if ("spider-man".equals(c.id)) { sm = c; break; }
         }
-        float headCx = (sm != null) ? sm.centerX : 1285.5f;
-        float headCy = (sm != null) ? (sm.y + sm.height * 0.16f) : 473f;
-        float baseRadius = (sm != null) ? (sm.width * 0.25f) : 100f;
+        if (sm == null) return;
 
+        float scaleFactor = sm.width / 405f;
+
+        // Generate burst parameters that look a little different every time:
         for (int i = 0; i < count; i++) {
-            TingleLine tl = new TingleLine();
-            // Radiating angles across top hemisphere (-2.8 to -0.34 rad)
-            float angle = -2.8f + (float) i * (2.46f / (float) (count - 1)) + (random.nextFloat() - 0.5f) * 0.15f;
-            float r1 = baseRadius + random.nextFloat() * 15f;
-            float len = 35f + random.nextFloat() * 35f;
-            float r2 = r1 + len;
-
-            tl.startX = headCx + (float) Math.cos(angle) * r1;
-            tl.startY = headCy + (float) Math.sin(angle) * r1;
-            tl.endX = headCx + (float) Math.cos(angle) * r2;
-            tl.endY = headCy + (float) Math.sin(angle) * r2;
-
-            tl.color = random.nextBoolean() ? 0xFFFFFFFF : 0xFFE5484D;
-            tl.delayMs = random.nextInt(60);
-            tingleLines[i] = tl;
+            TingleCurve tc = tingleCurves[i];
+            float baseAngle = TINGLE_ANGLES[i];
+            // Organic angle jitter (+- 5 deg)
+            tc.angle = baseAngle + (random.nextFloat() - 0.5f) * 10f;
+            float rEdge = TINGLE_RADII[i] * scaleFactor;
+            // Shortened start distance close to mask
+            tc.rStart = rEdge + (6f + random.nextFloat() * 4f) * scaleFactor;
+            // Shortened length matching reference image
+            tc.length = (36f + random.nextFloat() * 8f) * scaleFactor;
+            // Bold amplitude for pronounced comic-book S-waves
+            tc.amp = (6.5f + random.nextFloat() * 2.0f) * scaleFactor;
+            // ~1.2 to 1.45 wave cycles
+            tc.waves = 1.2f + random.nextFloat() * 0.25f;
+            float dir = (i % 2 == 0) ? 1.0f : -1.0f;
+            tc.phaseOffset = (float) (random.nextFloat() * Math.PI * 2.0);
+            // Smooth, slow continuous waving speed (~2.2 rad/sec)
+            tc.waveSpeed = (2.2f + random.nextFloat() * 0.5f) * dir;
+            // Burst-in delay stagger
+            tc.delayMs = (long) (i * 8 + random.nextInt(15));
         }
     }
 
@@ -344,13 +368,13 @@ public class FavouritesLineupView extends View {
         String title = (selected != null) ? selected.franchise.toUpperCase() : "MY FAVOURITES";
         canvas.drawText(title, 960f, 85f, textPaint);
 
-        // Calculate Spider-Sense thud animation
+        // Calculate Spider-Sense single vertical thud animation (no vibration, settles smoothly)
         float spideyThudY = 0f;
         long elapsed = spiderSenseActive ? (SystemClock.uptimeMillis() - spiderSenseStart) : 0;
         if (spiderSenseActive && selected != null && "spider-man".equals(selected.id)) {
             if (elapsed < SPIDER_THUD_MS) {
-                // Drop ~12px and settle back at 150ms
-                spideyThudY = 12f * (float) Math.sin((elapsed / (float) SPIDER_THUD_MS) * Math.PI);
+                // Drop ~10px and settle back smoothly at 180ms with single half-sine
+                spideyThudY = 10f * (float) Math.sin((elapsed / (float) SPIDER_THUD_MS) * Math.PI);
             }
         }
 
@@ -383,18 +407,79 @@ public class FavouritesLineupView extends View {
             for (Character c : frontRow) drawCharacter(canvas, c, false, 0f);
         }
 
-        // 4. Spider-Sense radiating tingle lines (burst around Spider-Man's head, fades within 700ms)
-        if (spiderSenseActive && selected != null && "spider-man".equals(selected.id) && tingleLines != null) {
+        // 4. Spider-Sense curved white tingle lines (burst around Spider-Man's mask, ~5 sec smooth continuous wave)
+        if (spiderSenseActive && selected != null && "spider-man".equals(selected.id) && tingleCurves != null) {
             if (elapsed < SPIDER_FADE_MS) {
-                float fadeAlpha = Math.max(0f, 1f - (elapsed / (float) SPIDER_FADE_MS));
-                for (TingleLine tl : tingleLines) {
-                    if (elapsed >= tl.delayMs) {
-                        int baseA = Color.alpha(tl.color);
-                        int lineA = (int) (baseA * fadeAlpha);
-                        spiderPaint.setColor((tl.color & 0x00FFFFFF) | (lineA << 24));
-                        canvas.drawLine(tl.startX, tl.startY + spideyThudY, tl.endX, tl.endY + spideyThudY, spiderPaint);
+                // Opacity envelope:
+                // 0 to 200ms: burst in
+                // 200ms to 4200ms: sustained full opacity (1.0)
+                // 4200ms to 5000ms: smooth fade out to 0
+                float globalAlpha;
+                if (elapsed < 200) {
+                    globalAlpha = elapsed / 200f;
+                } else if (elapsed > 4200) {
+                    globalAlpha = Math.max(0f, 1f - (elapsed - 4200f) / 800f);
+                } else {
+                    globalAlpha = 1.0f;
+                }
+
+                Character sm = selected;
+                float headCx = sm.x + sm.width * (244f / 405f);
+                float headCy = sm.y + sm.height * (115f / 778f);
+
+                canvas.save();
+                float scale = 1.08f;
+                float pivotX = selected.centerX;
+                float pivotY = selected.y + selected.height * 0.65f;
+                canvas.scale(scale, scale, pivotX, pivotY);
+                canvas.translate(0, spideyThudY);
+
+                float timeSec = elapsed / 1000f;
+
+                for (TingleCurve tc : tingleCurves) {
+                    if (tc != null && elapsed >= tc.delayMs) {
+                        float curveAlpha = globalAlpha;
+                        if (elapsed < tc.delayMs + 150) {
+                            curveAlpha *= (elapsed - tc.delayMs) / 150f;
+                        }
+
+                        // Recompute continuous smooth, slow wave path
+                        float rad = (float) Math.toRadians(tc.angle);
+                        float cosA = (float) Math.cos(rad);
+                        float sinA = (float) Math.sin(rad);
+                        float perpX = -sinA;
+                        float perpY = cosA;
+
+                        float waveShift = timeSec * tc.waveSpeed + tc.phaseOffset;
+
+                        Path path = tc.path;
+                        path.reset();
+                        int steps = 24;
+                        for (int s = 0; s <= steps; s++) {
+                            float t = s / (float) steps;
+                            float dist = tc.rStart + t * tc.length;
+                            float waveDisp = tc.amp * (float) Math.sin(t * Math.PI * 2.0 * tc.waves + waveShift);
+                            float px = headCx + cosA * dist + perpX * waveDisp;
+                            float py = headCy + sinA * dist + perpY * waveDisp;
+                            if (s == 0) {
+                                path.moveTo(px, py);
+                            } else {
+                                path.lineTo(px, py);
+                            }
+                        }
+
+                        // 1. Soft outer luminous aura pass (thicker translucent white)
+                        spiderPaint.setStrokeWidth(8.5f);
+                        spiderPaint.setColor(Color.argb((int) (70 * curveAlpha), 255, 255, 255));
+                        canvas.drawPath(path, spiderPaint);
+
+                        // 2. Thick crisp core pass (bold solid pure white #FFFFFF)
+                        spiderPaint.setStrokeWidth(4.8f);
+                        spiderPaint.setColor(Color.argb((int) (255 * curveAlpha), 255, 255, 255));
+                        canvas.drawPath(path, spiderPaint);
                     }
                 }
+                canvas.restore();
                 postInvalidateOnAnimation();
             } else {
                 spiderSenseActive = false;
