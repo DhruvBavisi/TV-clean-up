@@ -27,14 +27,14 @@ MAPPING = {
         "name": "Jack Sparrow",
         "franchise": "Pirates of the Caribbean",
         "color": "#C9A227",
-        "row": "back"
+        "row": "front"
     },
     "better-call-saul": {
         "id": "saul-goodman",
         "name": "Saul Goodman",
         "franchise": "Better Call Saul",
         "color": "#1FB5C9",
-        "row": "front"
+        "row": "back"
     },
     "spiderman": {
         "id": "spider-man",

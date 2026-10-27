@@ -11,8 +11,6 @@ import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
-import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.os.SystemClock;
@@ -22,7 +20,6 @@ import android.view.View;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.Random;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -70,26 +67,26 @@ public class FavouritesLineupView extends View {
         }
     }
 
-    // Back row: Jack Sparrow, Walter White (middle), Spider-Man
+    // Back row: Saul Goodman, Walter White (middle), Spider-Man
     public final Character[] backRow = new Character[] {
-            new Character("jack-sparrow", "Jack Sparrow", "Pirates of the Caribbean",
-                    0xFFC9A227, false, "jack-sparrow.png", "jack-sparrow.jpg", 417, 314, 541, 938, 687.5f),
+            new Character("saul-goodman", "Saul Goodman", "Better Call Saul",
+                    0xFF1FB5C9, false, "saul-goodman.png", "saul-goodman.jpg", 426, 357, 427, 613, 639.5f),
             new Character("walter-white", "Walter White", "Breaking Bad",
-                    0xFF3E8E41, false, "walter-white.png", "walter-white.jpg", 740, 215, 534, 705, 1007.0f),
+                    0xFF3E8E41, false, "walter-white.png", "walter-white.jpg", 750, 215, 534, 705, 1017.0f),
             new Character("spider-man", "Spider-Man", "Spider-Man",
-                    0xFFE5484D, false, "spider-man.png", "spider-man.jpg", 1083, 349, 405, 778, 1285.5f)
+                    0xFFE5484D, false, "spider-man.png", "spider-man.jpg", 1155, 347, 389, 733, 1349.5f)
     };
 
-    // Front row: Saul Goodman, Batman, Tony Stark, John Wick
+    // Front row: Jack Sparrow, Batman, Tony Stark, John Wick
     public final Character[] frontRow = new Character[] {
-            new Character("saul-goodman", "Saul Goodman", "Better Call Saul",
-                    0xFF1FB5C9, true, "saul-goodman.png", "saul-goodman.jpg", 234, 595, 387, 490, 427.5f),
+            new Character("jack-sparrow", "Jack Sparrow", "Pirates of the Caribbean",
+                    0xFFC9A227, true, "jack-sparrow.png", "jack-sparrow.jpg", 184, 639, 399, 441, 383.5f),
             new Character("batman", "Batman", "Batman",
-                    0xFF8A8F98, true, "batman.png", "batman.jpg", 510, 529, 568, 703, 794.0f),
+                    0xFF8A8F98, true, "batman.png", "batman.jpg", 535, 583, 492, 497, 781.0f),
             new Character("tony-stark", "Tony Stark", "Iron Man",
-                    0xFFE5A100, true, "tony-stark.png", "tony-stark.jpg", 773, 581, 634, 707, 1090.0f),
+                    0xFFE5A100, true, "tony-stark.png", "tony-stark.jpg", 946, 618, 443, 462, 1167.5f),
             new Character("john-wick", "John Wick", "John Wick",
-                    0xFFD62839, true, "john-wick.png", "john-wick.jpg", 1296, 573, 390, 518, 1491.0f)
+                    0xFFD62839, true, "john-wick.png", "john-wick.jpg", 1372, 637, 364, 443, 1554.0f)
     };
 
     private static final int ROW_BACK = 0;
@@ -104,34 +101,45 @@ public class FavouritesLineupView extends View {
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fadePaint = new Paint();
-    private final Paint spiderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final ColorMatrixColorFilter bwFilter;
-    private final Random random = new Random();
 
-    // Spider-Sense effect state
-    private boolean spiderSenseActive = false;
-    private long spiderSenseStart = 0;
-    private static final int SPIDER_THUD_MS = 180;
-    private static final int SPIDER_FADE_MS = 5000;
-    private static class TingleCurve {
-        final Path path = new Path();
-        float angle;
-        float rStart;
-        float length;
-        float amp;
-        float waves;
-        float waveSpeed;
-        float phaseOffset;
-        long delayMs;
+    // --- Animation clock and helpers (Step 2) ---
+    private long selectAnimStart = 0;        // uptimeMillis at selection
+    private String prevTitle = null;
+
+    private static float win(float t, float a, float b) {
+        float v = (t - a) / (b - a);
+        return v < 0f ? 0f : (v > 1f ? 1f : v);
     }
-    private static final float[] TINGLE_ANGLES = new float[] {
-            -165f, -140f, -105f, -80f, -55f, -30f, -5f, 20f
+    private static float easeOut3(float x) { float u = 1f - x; return 1f - u * u * u; }
+    private static float easeOut2(float x) { float u = 1f - x; return 1f - u * u; }
+
+    // --- Squiggle geometry (Step 4a) ---
+    private static final float HEAD_W = 170f;
+
+    // --- Squiggle table (Step 4b) ---
+    // Columns: cx, cy (head widths from head-top centre, y down), length (head widths),
+    // angleDeg (direction base to tip, 0=right, 90=down, -90=up), cycles,
+    // inStart, inEnd, outStart, outEnd (seconds), wavePhase, swayPhase
+    private static final float[][] SQ = {
+     /*A*/ {-0.54f, 0.06f, 0.37f, -125f, 1.6f, 0.14f, 0.52f, 0.75f, 1.35f, 0.0f, 0.7f},
+     /*B*/ {-0.21f,-0.11f, 0.23f, -100f, 1.5f, 0.09f, 0.42f, 0.72f, 1.30f, 1.3f, 2.1f},
+     /*C*/ { 0.18f,-0.12f, 0.27f,  -80f, 1.5f, 0.09f, 0.42f, 0.72f, 1.30f, 2.6f, 0.2f},
+     /*D*/ { 0.57f, 0.11f, 0.32f,  -45f, 1.6f, 0.14f, 0.52f, 0.75f, 1.33f, 3.9f, 1.5f},
+     /*E*/ { 0.79f, 0.58f, 0.33f,  -35f, 1.6f, 0.24f, 0.57f, 0.75f, 1.33f, 5.0f, 2.8f},
+     /*F*/ {-0.90f, 0.88f, 0.33f,  172f, 1.6f, 0.24f, 0.57f, 0.75f, 1.33f, 0.9f, 0.9f},
+     /*G*/ {-0.81f, 1.43f, 0.20f,  175f, 1.5f, 0.28f, 0.57f, 0.75f, 1.33f, 2.2f, 1.9f},
+     /*H*/ { 0.79f, 1.25f, 0.18f,  -10f, 1.5f, 0.28f, 0.57f, 0.75f, 1.33f, 3.3f, 0.4f}
     };
-    private static final float[] TINGLE_RADII = new float[] {
-            92f, 104f, 111f, 112f, 107f, 99f, 87f, 87f
-    };
-    private TingleCurve[] tingleCurves;
+
+    // --- Squiggle paints (Step 4c) ---
+    private final Paint sqFill = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint sqHalo = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path sqPath = new Path();
+
+    // Reusable ColorMatrix for bloom animation
+    private final ColorMatrix bloomMatrix = new ColorMatrix();
 
     public FavouritesLineupView(Context context) {
         this(context, null);
@@ -152,9 +160,9 @@ public class FavouritesLineupView extends View {
         textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         textPaint.setLetterSpacing(0.18f);
 
-        spiderPaint.setStyle(Paint.Style.STROKE);
-        spiderPaint.setStrokeCap(Paint.Cap.ROUND);
-        spiderPaint.setStrokeJoin(Paint.Join.ROUND);
+        sqHalo.setStyle(Paint.Style.STROKE);
+        sqHalo.setStrokeCap(Paint.Cap.ROUND);
+        sqHalo.setStrokeJoin(Paint.Join.ROUND);
 
         Shader fadeShader = new LinearGradient(0, 840, 0, 1080, Color.TRANSPARENT, Color.BLACK, Shader.TileMode.CLAMP);
         fadePaint.setShader(fadeShader);
@@ -186,7 +194,8 @@ public class FavouritesLineupView extends View {
     public void selectNobody() {
         selectedRow = -1;
         selectedCol = -1;
-        spiderSenseActive = false;
+        selectAnimStart = 0;
+        prevTitle = null;
         if (listener != null) listener.onNobodySelected();
         invalidate();
     }
@@ -212,62 +221,22 @@ public class FavouritesLineupView extends View {
 
     public void selectCharacter(int row, int col) {
         if (this.selectedRow == row && this.selectedCol == col) return;
+        // Capture previous title before overwriting
+        Character previous = getSelectedCharacter();
+        prevTitle = (previous != null) ? previous.franchise.toUpperCase() : "MY FAVOURITES";
+
         this.selectedRow = row;
         this.selectedCol = col;
+        selectAnimStart = SystemClock.uptimeMillis();
+
         Character selected = getSelectedCharacter();
-        if (selected != null && "spider-man".equals(selected.id)) {
-            triggerSpiderSense();
-        } else {
-            spiderSenseActive = false;
-        }
         if (listener != null && selected != null) {
             listener.onCharacterSelected(selected);
         }
         invalidate();
     }
 
-    private void triggerSpiderSense() {
-        spiderSenseActive = true;
-        spiderSenseStart = SystemClock.uptimeMillis();
-        int count = TINGLE_ANGLES.length;
-        if (tingleCurves == null || tingleCurves.length != count) {
-            tingleCurves = new TingleCurve[count];
-            for (int i = 0; i < count; i++) {
-                tingleCurves[i] = new TingleCurve();
-            }
-        }
 
-        Character sm = null;
-        for (Character c : backRow) {
-            if ("spider-man".equals(c.id)) { sm = c; break; }
-        }
-        if (sm == null) return;
-
-        float scaleFactor = sm.width / 405f;
-
-        // Generate burst parameters that look a little different every time:
-        for (int i = 0; i < count; i++) {
-            TingleCurve tc = tingleCurves[i];
-            float baseAngle = TINGLE_ANGLES[i];
-            // Organic angle jitter (+- 5 deg)
-            tc.angle = baseAngle + (random.nextFloat() - 0.5f) * 10f;
-            float rEdge = TINGLE_RADII[i] * scaleFactor;
-            // Shortened start distance close to mask
-            tc.rStart = rEdge + (6f + random.nextFloat() * 4f) * scaleFactor;
-            // Shortened length matching reference image
-            tc.length = (36f + random.nextFloat() * 8f) * scaleFactor;
-            // Bold amplitude for pronounced comic-book S-waves
-            tc.amp = (6.5f + random.nextFloat() * 2.0f) * scaleFactor;
-            // ~1.2 to 1.45 wave cycles
-            tc.waves = 1.2f + random.nextFloat() * 0.25f;
-            float dir = (i % 2 == 0) ? 1.0f : -1.0f;
-            tc.phaseOffset = (float) (random.nextFloat() * Math.PI * 2.0);
-            // Smooth, slow continuous waving speed (~2.2 rad/sec)
-            tc.waveSpeed = (2.2f + random.nextFloat() * 0.5f) * dir;
-            // Burst-in delay stagger
-            tc.delayMs = (long) (i * 8 + random.nextInt(15));
-        }
-    }
 
     private long lastJsonMtime = 0;
 
@@ -355,6 +324,16 @@ public class FavouritesLineupView extends View {
 
         Character selected = getSelectedCharacter();
 
+        // --- Compute animation time once (Step 2c) ---
+        float t = (selected == null) ? 99f
+            : (SystemClock.uptimeMillis() - selectAnimStart) / 1000f;
+
+        boolean isSpider = selected != null && "spider-man".equals(selected.id);
+
+        float settle = (selected != null) ? 0.96f + 0.04f * easeOut3(win(t, 0f, 0.75f)) : 1f;
+        canvas.save();
+        canvas.scale(settle, settle, 960f, 1080f);
+
         // 1. Draw soft radial glow behind the group in selected character's color
         if (selected != null) {
             int glowColor = (selected.color & 0x00FFFFFF) | 0x66000000;
@@ -364,18 +343,17 @@ public class FavouritesLineupView extends View {
             canvas.drawCircle(selected.centerX, selected.y + 220f, 480f, glowPaint);
         }
 
-        // 2. Draw Franchise name above the group
+        // 2. Draw Franchise name above the group --- TITLE CROSSFADE (Step 3c) ---
         String title = (selected != null) ? selected.franchise.toUpperCase() : "MY FAVOURITES";
-        canvas.drawText(title, 960f, 85f, textPaint);
-
-        // Calculate Spider-Sense single vertical thud animation (no vibration, settles smoothly)
-        float spideyThudY = 0f;
-        long elapsed = spiderSenseActive ? (SystemClock.uptimeMillis() - spiderSenseStart) : 0;
-        if (spiderSenseActive && selected != null && "spider-man".equals(selected.id)) {
-            if (elapsed < SPIDER_THUD_MS) {
-                // Drop ~10px and settle back smoothly at 180ms with single half-sine
-                spideyThudY = 10f * (float) Math.sin((elapsed / (float) SPIDER_THUD_MS) * Math.PI);
-            }
+        float p = win(t, 0f, 0.17f);
+        if (prevTitle != null && !prevTitle.equals(title) && p < 1f) {
+            textPaint.setAlpha((int) (255 * (1f - p)));
+            canvas.drawText(prevTitle, 960f, 85f, textPaint);
+            textPaint.setAlpha((int) (255 * p));
+            canvas.drawText(title, 960f, 85f, textPaint);
+            textPaint.setAlpha(255);
+        } else {
+            canvas.drawText(title, 960f, 85f, textPaint);
         }
 
         // 3. Draw Characters with correct Layering:
@@ -383,131 +361,141 @@ public class FavouritesLineupView extends View {
         // Selected front-row character steps in front of everyone.
         if (selected != null && selected.isFrontRow) {
             // Draw all back row characters (b&w)
-            for (Character c : backRow) drawCharacter(canvas, c, false, 0f);
+            for (Character c : backRow) drawCharacter(canvas, c, false, t);
             // Draw unselected front row characters (b&w)
             for (Character c : frontRow) {
-                if (c != selected) drawCharacter(canvas, c, false, 0f);
+                if (c != selected) drawCharacter(canvas, c, false, t);
             }
             // Draw selected front row character (color, scaled, front-most)
-            drawCharacter(canvas, selected, true, 0f);
+            drawCharacter(canvas, selected, true, t);
         } else if (selected != null) {
             // Selected is back row:
             // Draw unselected back row characters (b&w)
             for (Character c : backRow) {
-                if (c != selected) drawCharacter(canvas, c, false, 0f);
+                if (c != selected) drawCharacter(canvas, c, false, t);
             }
             // Draw selected back row character (color, scaled, stays behind front row)
-            float thud = "spider-man".equals(selected.id) ? spideyThudY : 0f;
-            drawCharacter(canvas, selected, true, thud);
+            drawCharacter(canvas, selected, true, t);
             // Draw all front row characters (b&w, on top of back row)
-            for (Character c : frontRow) drawCharacter(canvas, c, false, 0f);
+            for (Character c : frontRow) drawCharacter(canvas, c, false, t);
         } else {
             // Nobody selected: draw all b&w
-            for (Character c : backRow) drawCharacter(canvas, c, false, 0f);
-            for (Character c : frontRow) drawCharacter(canvas, c, false, 0f);
+            for (Character c : backRow) drawCharacter(canvas, c, false, t);
+            for (Character c : frontRow) drawCharacter(canvas, c, false, t);
         }
 
-        // 4. Spider-Sense curved white tingle lines (burst around Spider-Man's mask, ~5 sec smooth continuous wave)
-        if (spiderSenseActive && selected != null && "spider-man".equals(selected.id) && tingleCurves != null) {
-            if (elapsed < SPIDER_FADE_MS) {
-                // Opacity envelope:
-                // 0 to 200ms: burst in
-                // 200ms to 4200ms: sustained full opacity (1.0)
-                // 4200ms to 5000ms: smooth fade out to 0
-                float globalAlpha;
-                if (elapsed < 200) {
-                    globalAlpha = elapsed / 200f;
-                } else if (elapsed > 4200) {
-                    globalAlpha = Math.max(0f, 1f - (elapsed - 4200f) / 800f);
-                } else {
-                    globalAlpha = 1.0f;
-                }
-
-                Character sm = selected;
-                float headCx = sm.x + sm.width * (244f / 405f);
-                float headCy = sm.y + sm.height * (115f / 778f);
-
-                canvas.save();
-                float scale = 1.08f;
-                float pivotX = selected.centerX;
-                float pivotY = selected.y + selected.height * 0.65f;
-                canvas.scale(scale, scale, pivotX, pivotY);
-                canvas.translate(0, spideyThudY);
-
-                float timeSec = elapsed / 1000f;
-
-                for (TingleCurve tc : tingleCurves) {
-                    if (tc != null && elapsed >= tc.delayMs) {
-                        float curveAlpha = globalAlpha;
-                        if (elapsed < tc.delayMs + 150) {
-                            curveAlpha *= (elapsed - tc.delayMs) / 150f;
-                        }
-
-                        // Recompute continuous smooth, slow wave path
-                        float rad = (float) Math.toRadians(tc.angle);
-                        float cosA = (float) Math.cos(rad);
-                        float sinA = (float) Math.sin(rad);
-                        float perpX = -sinA;
-                        float perpY = cosA;
-
-                        float waveShift = timeSec * tc.waveSpeed + tc.phaseOffset;
-
-                        Path path = tc.path;
-                        path.reset();
-                        int steps = 24;
-                        for (int s = 0; s <= steps; s++) {
-                            float t = s / (float) steps;
-                            float dist = tc.rStart + t * tc.length;
-                            float waveDisp = tc.amp * (float) Math.sin(t * Math.PI * 2.0 * tc.waves + waveShift);
-                            float px = headCx + cosA * dist + perpX * waveDisp;
-                            float py = headCy + sinA * dist + perpY * waveDisp;
-                            if (s == 0) {
-                                path.moveTo(px, py);
-                            } else {
-                                path.lineTo(px, py);
-                            }
-                        }
-
-                        // 1. Soft outer luminous aura pass (thicker translucent white)
-                        spiderPaint.setStrokeWidth(8.5f);
-                        spiderPaint.setColor(Color.argb((int) (70 * curveAlpha), 255, 255, 255));
-                        canvas.drawPath(path, spiderPaint);
-
-                        // 2. Thick crisp core pass (bold solid pure white #FFFFFF)
-                        spiderPaint.setStrokeWidth(4.8f);
-                        spiderPaint.setColor(Color.argb((int) (255 * curveAlpha), 255, 255, 255));
-                        canvas.drawPath(path, spiderPaint);
-                    }
-                }
-                canvas.restore();
-                postInvalidateOnAnimation();
-            } else {
-                spiderSenseActive = false;
-            }
+        // 4. Spider-Sense squiggles (Step 4e) — only for Spider-Man, inside the 1.08 scale
+        if (isSpider && selected != null) {
+            canvas.save();
+            canvas.scale(1.08f, 1.08f, selected.centerX, selected.y + selected.height * 0.65f);
+            drawSquiggles(canvas, selected, t);
+            canvas.restore();
         }
 
         // 5. Fade characters' legs into black at the bottom
         canvas.drawRect(0, 840, 1920, 1080, fadePaint);
 
-        canvas.restore();
+        canvas.restore(); // settle scale
+
+        canvas.restore(); // 1920x1080 scale
+
+        // --- KEEP DRAWING (Step 3d) ---
+        float animEnd = isSpider ? 1.45f : 0.80f;
+        if (selected != null && t < animEnd) {
+            postInvalidateOnAnimation();
+        }
     }
 
-    private void drawCharacter(Canvas canvas, Character c, boolean isSelected, float extraY) {
+    // --- COLOUR BLOOM + drawCharacter (Step 3b) ---
+    private void drawCharacter(Canvas canvas, Character c, boolean isSelected, float t) {
         ensureBitmap(c);
         if (c.bitmap == null) return;
 
         if (isSelected) {
-            bitmapPaint.setColorFilter(null);
+            float bloom = easeOut2(win(t, 0f, 0.65f));
+            if (bloom < 1f) {
+                bloomMatrix.setSaturation(bloom);
+                bitmapPaint.setColorFilter(new ColorMatrixColorFilter(bloomMatrix));
+            } else {
+                bitmapPaint.setColorFilter(null);
+            }
             canvas.save();
-            float scale = 1.08f;
-            float pivotX = c.centerX;
-            float pivotY = c.y + c.height * 0.65f;
-            canvas.scale(scale, scale, pivotX, pivotY);
-            canvas.drawBitmap(c.bitmap, c.x, c.y + extraY, bitmapPaint);
+            canvas.scale(1.08f, 1.08f, c.centerX, c.y + c.height * 0.65f);
+            canvas.drawBitmap(c.bitmap, c.x, c.y, bitmapPaint);
             canvas.restore();
+            bitmapPaint.setColorFilter(null);
         } else {
             bitmapPaint.setColorFilter(bwFilter);
-            canvas.drawBitmap(c.bitmap, c.x, c.y + extraY, bitmapPaint);
+            canvas.drawBitmap(c.bitmap, c.x, c.y, bitmapPaint);
+            bitmapPaint.setColorFilter(null);
+        }
+    }
+
+    // --- drawSquiggles (Step 4d) ---
+    private void drawSquiggles(Canvas canvas, Character sm, float t) {
+        float ox = sm.x + 243f;
+        float oy = sm.y;
+
+        for (float[] q : SQ) {
+            float grow   = easeOut2(win(t, q[5], q[6]));
+            float shrink = (float) Math.pow(win(t, q[7], q[8]), 1.3);
+            float vis    = grow * (1f - shrink);        // fraction drawn
+            if (vis < 0.02f) continue;
+            float alpha  = easeOut2(win(t, q[5], q[5] + 0.10f)) * (1f - shrink);
+            float len    = q[2] * HEAD_W;
+
+            // base from the UNSWAYED direction, then sway the direction
+            float a0 = (float) Math.toRadians(q[3]);
+            float cx = ox + q[0] * HEAD_W;
+            float cy = oy + q[1] * HEAD_W;
+            float bx = cx - (float) Math.cos(a0) * len / 2f;
+            float by = cy - (float) Math.sin(a0) * len / 2f;
+            float ang = a0 + (float) (0.05236 * Math.sin(2.61799 * t + q[10]));
+            float dx = (float) Math.cos(ang);
+            float dy = (float) Math.sin(ang);
+            float nx = -dy;
+            float ny = dx;
+            float amp = 0.20f * len;
+            float phase = (float) (Math.PI * t) + q[9];
+            float wmax = 4.25f;
+
+            int N = 28;
+            sqPath.reset();
+            for (int k = 0; k <= N; k++) {
+                float u = k / (float) N;
+                float f = u * vis;
+                float wave = amp * (float) Math.sin(2 * Math.PI * q[4] * f - phase);
+                float px = bx + dx * f * len + nx * wave;
+                float py = by + dy * f * len + ny * wave;
+                float w = wmax * (float) Math.pow(Math.sin(Math.PI * u), 0.7);
+                float lx = px + nx * w / 2f;
+                float ly = py + ny * w / 2f;
+                if (k == 0) sqPath.moveTo(lx, ly);
+                else sqPath.lineTo(lx, ly);
+            }
+            for (int k = N; k >= 0; k--) {
+                float u = k / (float) N;
+                float f = u * vis;
+                float wave = amp * (float) Math.sin(2 * Math.PI * q[4] * f - phase);
+                float px = bx + dx * f * len + nx * wave;
+                float py = by + dy * f * len + ny * wave;
+                float w = wmax * (float) Math.pow(Math.sin(Math.PI * u), 0.7);
+                sqPath.lineTo(px - nx * w / 2f, py - ny * w / 2f);
+            }
+            sqPath.close();
+
+            // Halo pass: width x2.2 effect via slightly larger path (18% of core alpha)
+            int haloAlpha = (int) (45.9f * alpha);
+            if (haloAlpha > 0) {
+                sqHalo.setColor(Color.argb(haloAlpha, 0xD9, 0xC8, 0xFF));
+                sqHalo.setStrokeWidth(wmax * 2.2f);
+                canvas.drawPath(sqPath, sqHalo);
+            }
+
+            // Core pass: solid white #FFFFFF
+            int coreAlpha = (int) (255 * alpha);
+            sqFill.setColor(Color.argb(coreAlpha, 255, 255, 255));
+            canvas.drawPath(sqPath, sqFill);
         }
     }
 

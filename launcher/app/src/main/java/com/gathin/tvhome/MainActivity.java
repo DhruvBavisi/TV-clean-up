@@ -30,6 +30,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.TransitionDrawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -1164,6 +1165,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
 
+        if (intent != null && intent.hasExtra("fav_select")) {
+            String target = intent.getStringExtra("fav_select");
+            if ("dock".equals(target)) {
+                returnToDock();
+            } else if ("nobody".equals(target)) {
+                scrollToFavourites();
+                if (favouritesLineup != null) favouritesLineup.selectNobody();
+            } else if (target != null && !target.isEmpty()) {
+                scrollToFavourites();
+                if (favouritesLineup != null) favouritesLineup.selectCharacter(target);
+            }
+            return;
+        }
+
         if (isFavouritesInFocus) {
             returnToDock();
         }
@@ -1222,6 +1237,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (isLibraryOpen) {
             if (libraryAdapter != null && libraryGrid != null) {
                 libraryAdapter.refocus(libraryGrid);
+            }
+        } else if (isFavouritesInFocus) {
+            if (favouritesLineup != null) {
+                favouritesLineup.post(favouritesLineup::requestFocus);
             }
         } else if (lastFocusedTopButtonId != 0) {
             View topBtn = findViewById(lastFocusedTopButtonId);
@@ -1432,6 +1451,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.removeCallbacks(showIdleClock);
         if (isFavouritesInFocus) {
             returnToDock();
+        }
+        if (favSceneBackdrop != null) {
+            favSceneBackdrop.setImageDrawable(null);
         }
         for (Bitmap b : sceneCache.values()) {
             if (b != null && !b.isRecycled()) b.recycle();
@@ -1977,15 +1999,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (idx >= 0 && idx < favouritesLineup.frontRow.length - 1) needed.add(favouritesLineup.frontRow[idx + 1].sceneFileName);
         }
 
-        sceneCache.keySet().removeIf(key -> {
-            if (!needed.contains(key)) {
-                Bitmap b = sceneCache.get(key);
-                if (b != null && !b.isRecycled()) b.recycle();
-                sceneMtime.remove(key);
-                return true;
-            }
-            return false;
-        });
+        if (sceneCache.size() > 8) {
+            sceneCache.keySet().removeIf(key -> {
+                if (!needed.contains(key)) {
+                    Bitmap b = sceneCache.get(key);
+                    if (b != null && !b.isRecycled()) b.recycle();
+                    sceneMtime.remove(key);
+                    return true;
+                }
+                return false;
+            });
+        }
 
         for (String file : needed) {
             File sf = new File(dir, "favourites/scenes/" + file);
@@ -2008,13 +2032,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         Bitmap currentScene = sceneCache.get(selected.sceneFileName);
         if (currentScene != null) {
-            favSceneBackdrop.setImageBitmap(currentScene);
-            if (favSceneBackdrop.getVisibility() != View.VISIBLE) {
+            BitmapDrawable next = new BitmapDrawable(getResources(), currentScene);
+            if (favSceneBackdrop.getVisibility() == View.VISIBLE
+                    && favSceneBackdrop.getDrawable() != null) {
+                Drawable prev = favSceneBackdrop.getDrawable();
+                if (prev instanceof TransitionDrawable) {
+                    prev = ((TransitionDrawable) prev).getDrawable(1);
+                }
+                TransitionDrawable td = new TransitionDrawable(new Drawable[] { prev, next });
+                td.setCrossFadeEnabled(true);
+                favSceneBackdrop.setImageDrawable(td);
+                favSceneBackdrop.setAlpha(1f);
+                td.startTransition(650);
+            } else {
+                favSceneBackdrop.setImageDrawable(next);
                 favSceneBackdrop.setVisibility(View.VISIBLE);
                 favSceneBackdrop.setAlpha(0f);
-                favSceneBackdrop.animate().alpha(1f).setDuration(250).start();
-            } else {
-                favSceneBackdrop.setAlpha(1f);
+                favSceneBackdrop.animate().alpha(1f).setDuration(650).start();
             }
         }
     }
@@ -2023,7 +2057,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (favSceneBackdrop != null && favSceneBackdrop.getVisibility() == View.VISIBLE) {
             favSceneBackdrop.animate().alpha(0f).setDuration(250).withEndAction(() -> {
                 favSceneBackdrop.setVisibility(View.GONE);
-                favSceneBackdrop.setImageBitmap(null);
+                favSceneBackdrop.setImageDrawable(null);
             }).start();
         }
     }
