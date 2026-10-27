@@ -21,6 +21,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
@@ -1060,6 +1062,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         favouritesLineup = findViewById(R.id.favouritesLineup);
         favouritesTitlePage = findViewById(R.id.favouritesTitlePage);
         favSceneBackdrop = findViewById(R.id.favSceneBackdrop);
+        if (favSceneBackdrop != null) {
+            ColorMatrix cm = new ColorMatrix();
+            cm.setSaturation(0f);
+            ColorMatrix scale = new ColorMatrix();
+            scale.setScale(0.38f, 0.38f, 0.38f, 1.0f);
+            cm.postConcat(scale);
+            favSceneBackdrop.setColorFilter(new ColorMatrixColorFilter(cm));
+            favSceneBackdrop.setBackgroundColor(Color.BLACK);
+        }
         if (cfg.favouritesLineup && favouritesLineup != null) {
             favouritesLineup.setVisibility(View.VISIBLE);
             setupFavourites();
@@ -2032,6 +2043,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         Bitmap currentScene = sceneCache.get(selected.sceneFileName);
         if (currentScene != null) {
+            favSceneBackdrop.animate().cancel();
             BitmapDrawable next = new BitmapDrawable(getResources(), currentScene);
             if (favSceneBackdrop.getVisibility() == View.VISIBLE
                     && favSceneBackdrop.getDrawable() != null) {
@@ -2042,13 +2054,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 TransitionDrawable td = new TransitionDrawable(new Drawable[] { prev, next });
                 td.setCrossFadeEnabled(true);
                 favSceneBackdrop.setImageDrawable(td);
-                favSceneBackdrop.setAlpha(1f);
+                favSceneBackdrop.setAlpha(1.0f);
                 td.startTransition(650);
             } else {
                 favSceneBackdrop.setImageDrawable(next);
                 favSceneBackdrop.setVisibility(View.VISIBLE);
                 favSceneBackdrop.setAlpha(0f);
-                favSceneBackdrop.animate().alpha(1f).setDuration(650).start();
+                favSceneBackdrop.animate().alpha(1.0f).setDuration(650).start();
             }
         }
     }

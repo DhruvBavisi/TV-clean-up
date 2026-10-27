@@ -100,6 +100,7 @@ public class FavouritesLineupView extends View {
     private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint headerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fadePaint = new Paint();
 
     private final ColorMatrixColorFilter bwFilter;
@@ -159,6 +160,12 @@ public class FavouritesLineupView extends View {
         textPaint.setTextSize(36f);
         textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         textPaint.setLetterSpacing(0.18f);
+
+        headerPaint.setColor(0xB3FFFFFF);
+        headerPaint.setTextAlign(Paint.Align.LEFT);
+        headerPaint.setTextSize(26f);
+        headerPaint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        headerPaint.setLetterSpacing(0.04f);
 
         sqHalo.setStyle(Paint.Style.STROKE);
         sqHalo.setStrokeCap(Paint.Cap.ROUND);
@@ -334,13 +341,31 @@ public class FavouritesLineupView extends View {
         canvas.save();
         canvas.scale(settle, settle, 960f, 1080f);
 
-        // 1. Draw soft radial glow behind the group in selected character's color
+        // Top-left persistent section header (matching reference design)
+        canvas.drawText("My Favourites", 72f, 68f, headerPaint);
+
+        // 1. Draw rich atmospheric radial glow behind the selected character
         if (selected != null) {
-            int glowColor = (selected.color & 0x00FFFFFF) | 0x66000000;
-            RadialGradient glow = new RadialGradient(selected.centerX, selected.y + 220f, 480f,
-                    glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP);
+            float glowAlpha = easeOut2(win(t, 0f, 0.40f));
+            int rgb = selected.color & 0x00FFFFFF;
+
+            int a0 = (int) (0xE8 * glowAlpha); // ~91% peak core
+            int a1 = (int) (0x9E * glowAlpha); // ~62% inner aura
+            int a2 = (int) (0x4E * glowAlpha); // ~31% mid spread
+            int a3 = (int) (0x16 * glowAlpha); // ~9% outer feather
+            int a4 = Color.TRANSPARENT;
+
+            int[] glowColors = new int[] { (a0 << 24) | rgb, (a1 << 24) | rgb, (a2 << 24) | rgb, (a3 << 24) | rgb, a4 };
+            float[] glowStops = new float[] { 0.0f, 0.22f, 0.48f, 0.74f, 1.0f };
+
+            // Center glow at upper torso / head
+            float glowY = selected.y + selected.height * 0.32f;
+            float glowRadius = 460f;
+
+            RadialGradient glow = new RadialGradient(selected.centerX, glowY, glowRadius,
+                    glowColors, glowStops, Shader.TileMode.CLAMP);
             glowPaint.setShader(glow);
-            canvas.drawCircle(selected.centerX, selected.y + 220f, 480f, glowPaint);
+            canvas.drawCircle(selected.centerX, glowY, glowRadius, glowPaint);
         }
 
         // 2. Draw Franchise name above the group --- TITLE CROSSFADE (Step 3c) ---
