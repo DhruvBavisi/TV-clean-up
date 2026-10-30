@@ -33,6 +33,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.TransitionDrawable;
+import android.media.AudioManager;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -127,6 +128,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Idle time on Home before ClockActivity; 0 is off (config.xml, home_idle_clock_minutes). */
     private long idleClockMs;
     private final Runnable showIdleClock = () -> {
+        try {
+            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (am != null && am.isMusicActive()) {
+                restartIdleClock();
+                return;
+            }
+        } catch (Throwable ignored) {}
         startActivity(new Intent(this, ClockActivity.class));
         overridePendingTransition(R.anim.screensaver_fade_in, R.anim.screensaver_fade_out);
     };
@@ -186,6 +194,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private View btnInputs;
     private View mainContent;
     private View btnMoreApps;
+    private boolean isMoreAppsFocused = false;
     private View libraryOverlay;
     private RecyclerView libraryGrid;
     private LibraryGridAdapter libraryAdapter;
@@ -257,6 +266,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private View wallpaperGradientScrim;
     private View homeVerticalScroll;
     private FavouritesLineupView favouritesLineup;
+    private CartoonFavouritesLineupView cartoonFavouritesLineup;
+    private int currentFavouritesPage = 1;
     private FavouritesTitlePageView favouritesTitlePage;
     private ImageView favSceneBackdrop;
     private boolean isFavouritesInFocus = false;
@@ -1013,6 +1024,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnMoreApps = findViewById(R.id.btnMoreApps);
         if (btnMoreApps != null) {
             btnMoreApps.setOnFocusChangeListener((v, focused) -> {
+                isMoreAppsFocused = focused;
                 v.animate().cancel();
                 float scale = focused ? 1.10f : 1.0f;
                 v.animate().scaleX(scale).scaleY(scale)
@@ -1060,6 +1072,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         libraryOverlay = findViewById(R.id.libraryOverlay);
         homeVerticalScroll = findViewById(R.id.homeVerticalScroll);
         favouritesLineup = findViewById(R.id.favouritesLineup);
+        cartoonFavouritesLineup = findViewById(R.id.cartoonFavouritesLineup);
         favouritesTitlePage = findViewById(R.id.favouritesTitlePage);
         favSceneBackdrop = findViewById(R.id.favSceneBackdrop);
         if (favSceneBackdrop != null) {
@@ -1113,6 +1126,53 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null && !openLauncherSettingsIfAsked(getIntent())) openInputsIfAsked(getIntent());
+        if (getIntent() != null && getIntent().hasExtra("fav_select")) {
+            grid.post(() -> handleFavSelect(getIntent()));
+        }
+    }
+
+    private void handleFavSelect(Intent intent) {
+        if (intent == null || !intent.hasExtra("fav_select")) return;
+        if (isLibraryOpen) {
+            closeLibraryOverlay();
+        }
+        String target = intent.getStringExtra("fav_select");
+        if ("dock".equals(target)) {
+            returnToDock();
+        } else if ("nobody".equals(target)) {
+            scrollToFavourites();
+            if (favouritesLineup != null) favouritesLineup.selectNobody();
+        } else if ("cartoon".equals(target)) {
+            if (!isFavouritesInFocus) {
+                scrollToFavourites();
+            }
+            if (currentFavouritesPage != 2) {
+                switchToCartoonFavourites(0);
+            } else if (cartoonFavouritesLineup != null) {
+                cartoonFavouritesLineup.selectCharacter("doremon");
+            }
+        } else if (target != null && target.startsWith("cartoon:")) {
+            if (!isFavouritesInFocus) {
+                scrollToFavourites();
+                switchToCartoonFavourites(0);
+            } else if (currentFavouritesPage != 2) {
+                switchToCartoonFavourites(0);
+            }
+            if (cartoonFavouritesLineup != null) {
+                cartoonFavouritesLineup.requestFocus();
+                cartoonFavouritesLineup.selectCharacter(target.substring("cartoon:".length()));
+            }
+        } else if (target != null && !target.isEmpty()) {
+            if (!isFavouritesInFocus) {
+                scrollToFavourites();
+            } else if (currentFavouritesPage != 1) {
+                switchToMainFavourites(0);
+            }
+            if (favouritesLineup != null) {
+                favouritesLineup.requestFocus();
+                favouritesLineup.selectCharacter(target);
+            }
+        }
     }
 
     /**
@@ -1177,16 +1237,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onNewIntent(intent);
 
         if (intent != null && intent.hasExtra("fav_select")) {
-            String target = intent.getStringExtra("fav_select");
-            if ("dock".equals(target)) {
-                returnToDock();
-            } else if ("nobody".equals(target)) {
-                scrollToFavourites();
-                if (favouritesLineup != null) favouritesLineup.selectNobody();
-            } else if (target != null && !target.isEmpty()) {
-                scrollToFavourites();
-                if (favouritesLineup != null) favouritesLineup.selectCharacter(target);
-            }
+            handleFavSelect(intent);
             return;
         }
 
@@ -1249,10 +1300,43 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (libraryAdapter != null && libraryGrid != null) {
                 libraryAdapter.refocus(libraryGrid);
             }
+        } else if (favouritesTitlePage != null && favouritesTitlePage.getVisibility() == View.VISIBLE) {
+            favouritesTitlePage.post(favouritesTitlePage::requestFocus);
         } else if (isFavouritesInFocus) {
-            if (favouritesLineup != null) {
-                favouritesLineup.post(favouritesLineup::requestFocus);
+            if (currentFavouritesPage == 2) {
+                if (favouritesLineup != null) {
+                    favouritesLineup.clearFocus();
+                    favouritesLineup.setVisibility(View.GONE);
+                }
+                hideSceneBackdrop();
+                if (cartoonFavouritesLineup != null) {
+                    cartoonFavouritesLineup.setVisibility(View.VISIBLE);
+                    cartoonFavouritesLineup.setTranslationX(0f);
+                    cartoonFavouritesLineup.setTranslationY(0f);
+                    cartoonFavouritesLineup.post(() -> {
+                        cartoonFavouritesLineup.requestFocus();
+                        cartoonFavouritesLineup.invalidate();
+                    });
+                }
+            } else if (currentFavouritesPage == 1) {
+                if (cartoonFavouritesLineup != null) {
+                    cartoonFavouritesLineup.clearFocus();
+                    cartoonFavouritesLineup.setVisibility(View.GONE);
+                }
+                if (favouritesLineup != null) {
+                    favouritesLineup.setVisibility(View.VISIBLE);
+                    favouritesLineup.setTranslationX(0f);
+                    favouritesLineup.setTranslationY(0f);
+                    favouritesLineup.post(() -> {
+                        favouritesLineup.requestFocus();
+                        FavouritesLineupView.Character selected = favouritesLineup.getSelectedCharacter();
+                        if (selected != null) updateSceneBackdrop(selected);
+                        favouritesLineup.invalidate();
+                    });
+                }
             }
+        } else if (isMoreAppsFocused && btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
+            btnMoreApps.post(btnMoreApps::requestFocus);
         } else if (lastFocusedTopButtonId != 0) {
             View topBtn = findViewById(lastFocusedTopButtonId);
             if (topBtn != null && topBtn.getVisibility() == View.VISIBLE) {
@@ -1271,7 +1355,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             case REFOCUS:
                 // The same tiles: only the focus goes back, as after a rebuild, without replaying the entrance.
                 tilesReady = false;
-                reloadApps(true, false, false);
+                if (!isFavouritesInFocus && (favouritesTitlePage == null || favouritesTitlePage.getVisibility() != View.VISIBLE)
+                        && !isLibraryOpen && lastFocusedTopButtonId == 0 && !isMoreAppsFocused) {
+                    reloadApps(true, false, false);
+                }
                 break;
             default:
                 break;
@@ -1356,7 +1443,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Capture the app before rebinding can move focus and overwrite its key.
         final String returnKey = lastFocusedKey;
         final int returnSlot = lastFocused;
-        final boolean restoreFocus = appLibrary == null && !isLibraryOpen && lastFocusedTopButtonId == 0 && (animate || grid.hasFocus());
+        final boolean restoreFocus = !isFavouritesInFocus
+                && (favouritesTitlePage == null || favouritesTitlePage.getVisibility() != View.VISIBLE)
+                && !isMoreAppsFocused
+                && appLibrary == null
+                && !isLibraryOpen
+                && lastFocusedTopButtonId == 0
+                && (animate || grid.hasFocus());
         if (restoreFocus) {
             glassShown = false;
             glass.setAlpha(0f);
@@ -1460,9 +1553,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onPause() {
         super.onPause();
         root.removeCallbacks(showIdleClock);
-        if (isFavouritesInFocus) {
-            returnToDock();
-        }
         if (favSceneBackdrop != null) {
             favSceneBackdrop.setImageDrawable(null);
         }
@@ -1525,6 +1615,35 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             startPendingSettingsReorder();
             if (libraryFocusPending && appLibrary == null) focusLibrary();
             showCardPrompt();
+            if (isFavouritesInFocus) {
+                if (currentFavouritesPage == 2) {
+                    if (favouritesLineup != null && favouritesLineup.hasFocus()) {
+                        favouritesLineup.clearFocus();
+                    }
+                    if (cartoonFavouritesLineup != null && !cartoonFavouritesLineup.hasFocus()) {
+                        cartoonFavouritesLineup.post(() -> {
+                            cartoonFavouritesLineup.requestFocus();
+                            cartoonFavouritesLineup.invalidate();
+                        });
+                    }
+                } else if (currentFavouritesPage == 1) {
+                    if (cartoonFavouritesLineup != null && cartoonFavouritesLineup.hasFocus()) {
+                        cartoonFavouritesLineup.clearFocus();
+                    }
+                    if (favouritesLineup != null && !favouritesLineup.hasFocus()) {
+                        favouritesLineup.post(() -> {
+                            favouritesLineup.requestFocus();
+                            FavouritesLineupView.Character selected = favouritesLineup.getSelectedCharacter();
+                            if (selected != null) updateSceneBackdrop(selected);
+                            favouritesLineup.invalidate();
+                        });
+                    }
+                }
+            } else if (favouritesTitlePage != null && favouritesTitlePage.getVisibility() == View.VISIBLE && !favouritesTitlePage.hasFocus()) {
+                favouritesTitlePage.post(favouritesTitlePage::requestFocus);
+            } else if (isMoreAppsFocused && btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE && !btnMoreApps.hasFocus()) {
+                btnMoreApps.post(btnMoreApps::requestFocus);
+            }
         }
     }
 
@@ -1938,30 +2057,111 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void setupFavourites() {
-        if (favouritesLineup == null) return;
-        favouritesLineup.setListener(new FavouritesLineupView.OnSelectionChangedListener() {
-            @Override
-            public void onCharacterSelected(FavouritesLineupView.Character character) {
-                updateSceneBackdrop(character);
-            }
+        if (favouritesLineup != null) {
+            favouritesLineup.setListener(new FavouritesLineupView.OnSelectionChangedListener() {
+                @Override
+                public void onCharacterSelected(FavouritesLineupView.Character character) {
+                    updateSceneBackdrop(character);
+                }
 
-            @Override
-            public void onNobodySelected() {
-                hideSceneBackdrop();
-            }
+                @Override
+                public void onNobodySelected() {
+                    hideSceneBackdrop();
+                }
 
-            @Override
-            public void onUpToDock() {
-                returnToDock();
-            }
+                @Override
+                public void onUpToDock() {
+                    returnToDock();
+                }
 
-            @Override
-            public void onCharacterActivated(FavouritesLineupView.Character character) {
-                openFavouritesTitlePage(character);
-            }
-        });
+                @Override
+                public void onCharacterActivated(FavouritesLineupView.Character character) {
+                    openFavouritesTitlePage(character);
+                }
+
+                @Override
+                public void onNavigateRightToSecondPage(int currentRow) {
+                    switchToCartoonFavourites(currentRow);
+                }
+            });
+        }
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.setListener(new CartoonFavouritesLineupView.OnSelectionChangedListener() {
+                @Override
+                public void onCharacterSelected(CartoonFavouritesLineupView.Character character) {
+                    hideSceneBackdrop();
+                }
+
+                @Override
+                public void onNobodySelected() {
+                    hideSceneBackdrop();
+                }
+
+                @Override
+                public void onUpToDock() {
+                    returnToDock();
+                }
+
+                @Override
+                public void onNavigateLeftToMainFavourites(int currentRow) {
+                    switchToMainFavourites(currentRow);
+                }
+
+                @Override
+                public void onCharacterActivated(CartoonFavouritesLineupView.Character character) {
+                    // Direct browser link will be provided by user later
+                }
+            });
+        }
         if (favouritesTitlePage != null) {
             favouritesTitlePage.setOnBackListener(this::closeFavouritesTitlePage);
+        }
+    }
+
+    private void switchToCartoonFavourites(int currentRow) {
+        currentFavouritesPage = 2;
+        hideSceneBackdrop();
+        if (favouritesLineup != null) {
+            favouritesLineup.clearFocus();
+            favouritesLineup.animate().translationX(-1920f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f))
+                    .withEndAction(() -> {
+                        if (currentFavouritesPage == 2 && favouritesLineup != null) {
+                            favouritesLineup.setVisibility(View.GONE);
+                        }
+                    }).start();
+        }
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.setVisibility(View.VISIBLE);
+            cartoonFavouritesLineup.setTranslationY(0f);
+            cartoonFavouritesLineup.animate().translationX(0f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+            cartoonFavouritesLineup.requestFocus();
+            cartoonFavouritesLineup.selectCharacter("doremon");
+        }
+    }
+
+    private void switchToMainFavourites(int currentRow) {
+        currentFavouritesPage = 1;
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.clearFocus();
+            cartoonFavouritesLineup.animate().translationX(1920f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f))
+                    .withEndAction(() -> {
+                        if (currentFavouritesPage == 1 && cartoonFavouritesLineup != null) {
+                            cartoonFavouritesLineup.setVisibility(View.GONE);
+                        }
+                    }).start();
+        }
+        if (favouritesLineup != null) {
+            favouritesLineup.setVisibility(View.VISIBLE);
+            favouritesLineup.setTranslationY(0f);
+            favouritesLineup.animate().translationX(0f).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+            favouritesLineup.requestFocus();
+            favouritesLineup.selectRightmost(currentRow);
+            FavouritesLineupView.Character selected = favouritesLineup.getSelectedCharacter();
+            if (selected != null) updateSceneBackdrop(selected);
         }
     }
 
@@ -2076,6 +2276,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void scrollToFavourites() {
         isFavouritesInFocus = true;
+        currentFavouritesPage = 1;
         hideHero();
         hideGlass();
         if (dockTagline != null) dockTagline.animate().alpha(0f).setDuration(160).start();
@@ -2086,12 +2287,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mainContent.animate().translationY(-scrollH).setDuration(280)
                     .setInterpolator(new DecelerateInterpolator(1.5f)).start();
         }
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.setTranslationX(1920f);
+            cartoonFavouritesLineup.setTranslationY(scrollH);
+            cartoonFavouritesLineup.setVisibility(View.GONE);
+        }
         if (favouritesLineup != null) {
             favouritesLineup.setVisibility(View.VISIBLE);
+            favouritesLineup.setTranslationX(0f);
             favouritesLineup.animate().translationY(0f).setDuration(280)
                     .setInterpolator(new DecelerateInterpolator(1.5f)).start();
             favouritesLineup.requestFocus();
-            favouritesLineup.selectMiddleBackRow();
+            favouritesLineup.selectMiddleBackRow(true);
         }
     }
 
@@ -2100,6 +2307,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             favouritesTitlePage.close();
         }
         isFavouritesInFocus = false;
+        if (favouritesLineup != null) {
+            favouritesLineup.selectNobody();
+        }
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.selectNobody();
+        }
         hideSceneBackdrop();
         int scrollH = mainContent != null && mainContent.getHeight() > 0 ? mainContent.getHeight() : 1080;
         if (mainContent != null) {
@@ -2108,8 +2321,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (favouritesLineup != null) {
             favouritesLineup.animate().translationY(scrollH).setDuration(280)
-                    .setInterpolator(new DecelerateInterpolator(1.5f)).start();
+                    .setInterpolator(new DecelerateInterpolator(1.5f))
+                    .withEndAction(() -> {
+                        favouritesLineup.setTranslationX(0f);
+                    }).start();
         }
+        if (cartoonFavouritesLineup != null) {
+            cartoonFavouritesLineup.animate().translationY(scrollH).setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator(1.5f))
+                    .withEndAction(() -> {
+                        cartoonFavouritesLineup.setTranslationX(1920f);
+                        cartoonFavouritesLineup.setVisibility(View.GONE);
+                    }).start();
+        }
+        currentFavouritesPage = 1;
         if (btnMoreApps != null && btnMoreApps.getVisibility() == View.VISIBLE) {
             btnMoreApps.requestFocus();
         } else if (grid != null) {

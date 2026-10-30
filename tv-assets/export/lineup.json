@@ -10,11 +10,11 @@
       "row": "back",
       "file": "walter-white.png",
       "scene_file": "walter-white.jpg",
-      "x": 750,
+      "x": 733,
       "y": 215,
       "width": 534,
       "height": 705,
-      "center_x": 1017.0
+      "center_x": 1000.0
     },
     {
       "id": "saul-goodman",
@@ -24,25 +24,11 @@
       "row": "back",
       "file": "saul-goodman.png",
       "scene_file": "saul-goodman.jpg",
-      "x": 426,
+      "x": 425,
       "y": 357,
       "width": 427,
       "height": 613,
-      "center_x": 639.5
-    },
-    {
-      "id": "jack-sparrow",
-      "name": "Jack Sparrow",
-      "franchise": "Pirates of the Caribbean",
-      "color": "#C9A227",
-      "row": "front",
-      "file": "jack-sparrow.png",
-      "scene_file": "jack-sparrow.jpg",
-      "x": 184,
-      "y": 639,
-      "width": 399,
-      "height": 441,
-      "center_x": 383.5
+      "center_x": 638.5
     },
     {
       "id": "spider-man",
@@ -52,11 +38,11 @@
       "row": "back",
       "file": "spider-man.png",
       "scene_file": "spider-man.jpg",
-      "x": 1155,
-      "y": 347,
-      "width": 389,
-      "height": 733,
-      "center_x": 1349.5
+      "x": 1112,
+      "y": 355,
+      "width": 385,
+      "height": 725,
+      "center_x": 1304.5
     },
     {
       "id": "john-wick",
@@ -66,11 +52,11 @@
       "row": "front",
       "file": "john-wick.png",
       "scene_file": "john-wick.jpg",
-      "x": 1372,
+      "x": 1326,
       "y": 637,
       "width": 364,
       "height": 443,
-      "center_x": 1554.0
+      "center_x": 1508.0
     },
     {
       "id": "batman",
@@ -80,11 +66,25 @@
       "row": "front",
       "file": "batman.png",
       "scene_file": "batman.jpg",
-      "x": 535,
-      "y": 583,
-      "width": 492,
-      "height": 497,
-      "center_x": 781.0
+      "x": 230,
+      "y": 591,
+      "width": 483,
+      "height": 489,
+      "center_x": 471.5
+    },
+    {
+      "id": "jack-sparrow",
+      "name": "Jack Sparrow",
+      "franchise": "Pirates of the Caribbean",
+      "color": "#C9A227",
+      "row": "front",
+      "file": "jack-sparrow.png",
+      "scene_file": "jack-sparrow.jpg",
+      "x": 651,
+      "y": 592,
+      "width": 345,
+      "height": 488,
+      "center_x": 823.5
     },
     {
       "id": "tony-stark",
@@ -94,11 +94,11 @@
       "row": "front",
       "file": "tony-stark.png",
       "scene_file": "tony-stark.jpg",
-      "x": 946,
+      "x": 943,
       "y": 618,
       "width": 443,
       "height": 462,
-      "center_x": 1167.5
+      "center_x": 1164.5
     }
   ]
 }

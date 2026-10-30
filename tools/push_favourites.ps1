@@ -69,7 +69,17 @@ if (Test-Path $scenesDir -PathType Container) {
     }
 }
 
-# 4. Push posters
+# 4. Push logos
+$logosDir = Join-Path $repoRoot "tv-assets\logos"
+if (Test-Path $logosDir -PathType Container) {
+    & $py -I tv.py "mkdir -p $dir/favourites/logos 2>/dev/null" | Out-Null
+    Get-ChildItem $logosDir -Filter "*.png" | ForEach-Object {
+        Write-Host "Pushing logo $($_.Name)..."
+        & $py -I tv.py --push $_.FullName "$dir/favourites/logos/$($_.Name)" | Out-Null
+    }
+}
+
+# 5. Push posters
 $postersDir = Join-Path $repoRoot "tv-assets\posters"
 if (Test-Path $postersDir -PathType Container) {
     Get-ChildItem $postersDir -Filter "*.jpg" | ForEach-Object {

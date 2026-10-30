@@ -530,6 +530,14 @@
             android:translationY="1080px"
             android:visibility="gone" />
 
+        <com.gathin.tvhome.CartoonFavouritesLineupView
+            android:id="@+id/cartoonFavouritesLineup"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:translationX="1920px"
+            android:translationY="1080px"
+            android:visibility="gone" />
+
         <com.gathin.tvhome.FavouritesTitlePageView
             android:id="@+id/favouritesTitlePage"
             android:layout_width="match_parent"

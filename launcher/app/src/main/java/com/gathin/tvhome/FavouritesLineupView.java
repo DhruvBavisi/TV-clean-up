@@ -18,8 +18,18 @@ import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
 
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import java.io.File;
 import java.io.FileInputStream;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,29 +46,104 @@ public class FavouritesLineupView extends View {
         void onNobodySelected();
         void onUpToDock();
         void onCharacterActivated(Character character);
+        default void onNavigateRightToSecondPage(int currentRow) {}
+    }
+
+    public static class GlowConfig {
+        public final String id;
+        public int color;
+        public float radius;
+        public float peakAlpha;
+        public float headX;
+        public float headY;
+        public float offsetX;
+        public float offsetY;
+
+        public GlowConfig(String id, int color, float radius, float peakAlpha,
+                          float headX, float headY, float offsetX, float offsetY) {
+            this.id = id;
+            this.color = color;
+            this.radius = radius;
+            this.peakAlpha = peakAlpha;
+            this.headX = headX;
+            this.headY = headY;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+        }
+
+        public float getCenterX() { return headX + offsetX; }
+        public float getCenterY() { return headY + offsetY; }
+    }
+
+    public static final Map<String, GlowConfig> GLOW_CONFIGS = new LinkedHashMap<>();
+    static {
+        // Tunable per-character config: Color, radius in px on 1920x1080, peakAlpha (luminance-compensated),
+        // head center coordinates derived from PSD cutout alpha channels, and fine offsets.
+        GLOW_CONFIGS.put("walter-white", new GlowConfig("walter-white", 0xFF2E9B47, 800f, 0.15f, 977f, 302f, 0f, 40f));
+        GLOW_CONFIGS.put("saul-goodman", new GlowConfig("saul-goodman", 0xFFE8A317, 720f, 0.13f, 636f, 433f, 0f, 40f));
+        GLOW_CONFIGS.put("jack-sparrow", new GlowConfig("jack-sparrow", 0xFF1E6585, 680f, 0.16f, 832f, 659f, 0f, 30f)); // Deep blue sea
+        GLOW_CONFIGS.put("spider-man",  new GlowConfig("spider-man",  0xFFE62429, 800f, 0.22f, 1353f, 442f, 0f, 40f));
+        GLOW_CONFIGS.put("john-wick",    new GlowConfig("john-wick",    0xFFA60F14, 700f, 0.22f, 1580f, 693f, 0f, 30f)); // Bloody red
+        GLOW_CONFIGS.put("batman",       new GlowConfig("batman",       0xFF3B5B8C, 740f, 0.14f, 450f, 662f, 0f, 30f));
+        GLOW_CONFIGS.put("tony-stark",   new GlowConfig("tony-stark",   0xFF00BFFF, 720f, 0.15f, 1206f, 675f, 0f, 30f)); // Tech blue
+    }
+
+    // Spec falloff curve:
+    // 0.00-0.20R -> 1.00; 0.40R -> 0.67; 0.52R -> 0.56; 0.65R -> 0.37; 0.87R -> 0.10; 1.00R -> 0.00
+    private static final float[] U_PTS = { 0.0f, 0.20f, 0.40f, 0.52f, 0.65f, 0.87f, 1.00f };
+    private static final float[] Y_PTS = { 1.0f, 1.00f, 0.67f, 0.56f, 0.37f, 0.10f, 0.00f };
+    private static final float[] FALLOFF_LUT = new float[1001];
+    static {
+        for (int i = 0; i <= 1000; i++) {
+            float u = i / 1000.0f;
+            if (u <= 0.20f) {
+                FALLOFF_LUT[i] = 1.0f;
+            } else if (u >= 1.0f) {
+                FALLOFF_LUT[i] = 0.0f;
+            } else {
+                int seg = 0;
+                while (seg < U_PTS.length - 1 && u > U_PTS[seg + 1]) {
+                    seg++;
+                }
+                float u0 = U_PTS[seg];
+                float u1 = U_PTS[seg + 1];
+                float y0 = Y_PTS[seg];
+                float y1 = Y_PTS[seg + 1];
+                float s = (u - u0) / (u1 - u0);
+                float w = s * s * (3f - 2f * s);
+                FALLOFF_LUT[i] = y0 + (y1 - y0) * w;
+            }
+        }
     }
 
     public static class Character {
         public final String id;
         public final String name;
         public final String franchise;
+        public final String title;
+        public final String logoName;
         public final int color;
         public final boolean isFrontRow;
         public final String fileName;
         public final String sceneFileName;
+        public final GlowConfig glowConfig;
         public int x, y, width, height;
         public float centerX;
         Bitmap bitmap;
 
-        Character(String id, String name, String franchise, int color, boolean isFrontRow,
+        Character(String id, String name, String franchise, String title, String logoName,
+                  int color, boolean isFrontRow,
                   String fileName, String sceneFileName, int x, int y, int width, int height, float centerX) {
             this.id = id;
             this.name = name;
             this.franchise = franchise;
+            this.title = title;
+            this.logoName = logoName;
             this.color = color;
             this.isFrontRow = isFrontRow;
             this.fileName = fileName;
             this.sceneFileName = sceneFileName;
+            this.glowConfig = GLOW_CONFIGS.get(id);
             this.x = x;
             this.y = y;
             this.width = width;
@@ -69,24 +154,24 @@ public class FavouritesLineupView extends View {
 
     // Back row: Saul Goodman, Walter White (middle), Spider-Man
     public final Character[] backRow = new Character[] {
-            new Character("saul-goodman", "Saul Goodman", "Better Call Saul",
-                    0xFF1FB5C9, false, "saul-goodman.png", "saul-goodman.jpg", 426, 357, 427, 613, 639.5f),
-            new Character("walter-white", "Walter White", "Breaking Bad",
-                    0xFF3E8E41, false, "walter-white.png", "walter-white.jpg", 750, 215, 534, 705, 1017.0f),
-            new Character("spider-man", "Spider-Man", "Spider-Man",
-                    0xFFE5484D, false, "spider-man.png", "spider-man.jpg", 1155, 347, 389, 733, 1349.5f)
+            new Character("saul-goodman", "Saul Goodman", "Better Call Saul", "Better Call Saul", "Netflix.png",
+                    0xFFFFB800, false, "saul-goodman.png", "saul-goodman.jpg", 425, 357, 427, 613, 638.5f),
+            new Character("walter-white", "Walter White", "Breaking Bad", "Breaking Bad", "Netflix.png",
+                    0xFF3E8E41, false, "walter-white.png", "walter-white.jpg", 733, 215, 534, 705, 1000.0f),
+            new Character("spider-man", "Spider-Man", "Spider-Man", "Spider-Man: No Way Home", "Apple.png",
+                    0xFFE5484D, false, "spider-man.png", "spider-man.jpg", 1112, 355, 385, 725, 1304.5f)
     };
 
-    // Front row: Jack Sparrow, Batman, Tony Stark, John Wick
+    // Front row: Batman, Jack Sparrow, Tony Stark, John Wick
     public final Character[] frontRow = new Character[] {
-            new Character("jack-sparrow", "Jack Sparrow", "Pirates of the Caribbean",
-                    0xFFC9A227, true, "jack-sparrow.png", "jack-sparrow.jpg", 184, 639, 399, 441, 383.5f),
-            new Character("batman", "Batman", "Batman",
-                    0xFF8A8F98, true, "batman.png", "batman.jpg", 535, 583, 492, 497, 781.0f),
-            new Character("tony-stark", "Tony Stark", "Iron Man",
-                    0xFFE5A100, true, "tony-stark.png", "tony-stark.jpg", 946, 618, 443, 462, 1167.5f),
-            new Character("john-wick", "John Wick", "John Wick",
-                    0xFFD62839, true, "john-wick.png", "john-wick.jpg", 1372, 637, 364, 443, 1554.0f)
+            new Character("batman", "Batman", "The Dark Knight", "The Dark Knight", "Prime.png",
+                    0xFFD2D8E0, true, "batman.png", "batman.jpg", 230, 591, 483, 489, 471.5f),
+            new Character("jack-sparrow", "Jack Sparrow", "Pirates of the Caribbean", "Pirates of the Caribbean", "JioHotstar.png",
+                    0xFF1E6585, true, "jack-sparrow.png", "jack-sparrow.jpg", 651, 592, 345, 488, 823.5f),
+            new Character("tony-stark", "Tony Stark", "Iron Man", "Iron Man", "JioHotstar.png",
+                    0xFF00BFFF, true, "tony-stark.png", "tony-stark.jpg", 943, 618, 443, 462, 1164.5f),
+            new Character("john-wick", "John Wick", "John Wick", "John Wick", "Prime.png",
+                    0xFFA60F14, true, "john-wick.png", "john-wick.jpg", 1326, 637, 364, 443, 1508.0f)
     };
 
     private static final int ROW_BACK = 0;
@@ -123,15 +208,16 @@ public class FavouritesLineupView extends View {
     // Columns: cx, cy (head widths from head-top centre, y down), length (head widths),
     // angleDeg (direction base to tip, 0=right, 90=down, -90=up), cycles,
     // inStart, inEnd, outStart, outEnd (seconds), wavePhase, swayPhase
+    // Note: outStart and outEnd reduced by 0.30s per user request
     private static final float[][] SQ = {
-     /*A*/ {-0.54f, 0.06f, 0.37f, -125f, 1.6f, 0.14f, 0.52f, 0.75f, 1.35f, 0.0f, 0.7f},
-     /*B*/ {-0.21f,-0.11f, 0.23f, -100f, 1.5f, 0.09f, 0.42f, 0.72f, 1.30f, 1.3f, 2.1f},
-     /*C*/ { 0.18f,-0.12f, 0.27f,  -80f, 1.5f, 0.09f, 0.42f, 0.72f, 1.30f, 2.6f, 0.2f},
-     /*D*/ { 0.57f, 0.11f, 0.32f,  -45f, 1.6f, 0.14f, 0.52f, 0.75f, 1.33f, 3.9f, 1.5f},
-     /*E*/ { 0.79f, 0.58f, 0.33f,  -35f, 1.6f, 0.24f, 0.57f, 0.75f, 1.33f, 5.0f, 2.8f},
-     /*F*/ {-0.90f, 0.88f, 0.33f,  172f, 1.6f, 0.24f, 0.57f, 0.75f, 1.33f, 0.9f, 0.9f},
-     /*G*/ {-0.81f, 1.43f, 0.20f,  175f, 1.5f, 0.28f, 0.57f, 0.75f, 1.33f, 2.2f, 1.9f},
-     /*H*/ { 0.79f, 1.25f, 0.18f,  -10f, 1.5f, 0.28f, 0.57f, 0.75f, 1.33f, 3.3f, 0.4f}
+     /*A*/ {-0.54f, 0.06f, 0.37f, -125f, 1.6f, 0.14f, 0.52f, 0.95f, 1.55f, 0.0f, 0.7f},
+     /*B*/ {-0.21f,-0.11f, 0.23f, -100f, 1.5f, 0.09f, 0.42f, 0.92f, 1.50f, 1.3f, 2.1f},
+     /*C*/ { 0.18f,-0.12f, 0.27f,  -80f, 1.5f, 0.09f, 0.42f, 0.92f, 1.50f, 2.6f, 0.2f},
+     /*D*/ { 0.57f, 0.11f, 0.32f,  -45f, 1.6f, 0.14f, 0.52f, 0.95f, 1.53f, 3.9f, 1.5f},
+     /*E*/ { 0.79f, 0.58f, 0.33f,  -35f, 1.6f, 0.24f, 0.57f, 0.95f, 1.53f, 5.0f, 2.8f},
+     /*F*/ {-0.90f, 0.88f, 0.33f,  172f, 1.6f, 0.24f, 0.57f, 0.95f, 1.53f, 0.9f, 0.9f},
+     /*G*/ {-0.81f, 1.43f, 0.20f,  175f, 1.5f, 0.28f, 0.57f, 0.95f, 1.53f, 2.2f, 1.9f},
+     /*H*/ { 0.79f, 1.25f, 0.18f,  -10f, 1.5f, 0.28f, 0.57f, 0.95f, 1.53f, 3.3f, 0.4f}
     };
 
     // --- Squiggle paints (Step 4c) ---
@@ -141,6 +227,97 @@ public class FavouritesLineupView extends View {
 
     // Reusable ColorMatrix for bloom animation
     private final ColorMatrix bloomMatrix = new ColorMatrix();
+
+    // Logo cache for streaming app badges
+    private final Map<String, Bitmap> logoCache = new HashMap<>();
+    private final RectF dstLogoRect = new RectF();
+
+    private Bitmap getLogo(String logoName) {
+        if (logoName == null || logoName.isEmpty()) return null;
+        if (logoCache.containsKey(logoName)) return logoCache.get(logoName);
+        File dir = Config.dir(getContext());
+        if (dir == null) return null;
+        File file = new File(dir, "favourites/logos/" + logoName);
+        if (!file.exists()) return null;
+        Bitmap b = BitmapFactory.decodeFile(file.getAbsolutePath());
+        if (b != null) logoCache.put(logoName, b);
+        return b;
+    }
+
+    // Total glow memory: 7 * 1920 * 1080 * 1 byte = 14,515,200 bytes (13.84 MB), strictly under 15 MB
+    private final Map<String, Bitmap> glowMasks = new ConcurrentHashMap<>();
+    private volatile Bitmap displayedGlowMask = null;
+    private volatile GlowConfig displayedGlowConfig = null;
+
+    private void initGlowMasksBackground() {
+        Thread thread = new Thread(() -> {
+            // Priority 1: build first-focused character: Walter White (breaking-bad)
+            buildGlowMask("walter-white");
+            // Priority 2: build remaining 6 characters
+            for (String id : GLOW_CONFIGS.keySet()) {
+                if (!"walter-white".equals(id)) {
+                    buildGlowMask(id);
+                }
+            }
+        }, "GlowMaskBuilder");
+        thread.setPriority(Thread.NORM_PRIORITY - 1);
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void buildGlowMask(String id) {
+        GlowConfig cfg = GLOW_CONFIGS.get(id);
+        if (cfg == null) return;
+        int w = 1920;
+        int h = 1080;
+        float cx = cfg.getCenterX();
+        float cy = cfg.getCenterY();
+        float R = cfg.radius;
+        float R2 = R * R;
+        float invR = 1.0f / R;
+
+        int minX = Math.max(0, (int) Math.floor(cx - R));
+        int maxX = Math.min(w, (int) Math.ceil(cx + R) + 1);
+        int minY = Math.max(0, (int) Math.floor(cy - R));
+        int maxY = Math.min(h, (int) Math.ceil(cy + R) + 1);
+
+        byte[] pixels = new byte[w * h];
+        Random rnd = new Random(id.hashCode());
+
+        for (int y = minY; y < maxY; y++) {
+            float dy = y - cy;
+            float dy2 = dy * dy;
+            int rowOffset = y * w;
+            for (int x = minX; x < maxX; x++) {
+                float dx = x - cx;
+                float d2 = dx * dx + dy2;
+                if (d2 < R2) {
+                    float d = (float) Math.sqrt(d2);
+                    float u = d * invR;
+                    int lutIdx = (int) (u * 1000f);
+                    if (lutIdx > 1000) lutIdx = 1000;
+                    float f = FALLOFF_LUT[lutIdx];
+                    // 1.5% amplitude dithering noise
+                    float noise = (rnd.nextFloat() - 0.5f) * 4.0f;
+                    int val = Math.max(0, Math.min(255, Math.round(f * 255f + noise)));
+                    pixels[rowOffset + x] = (byte) val;
+                }
+            }
+        }
+
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ALPHA_8);
+        bmp.copyPixelsFromBuffer(ByteBuffer.wrap(pixels));
+        glowMasks.put(id, bmp);
+
+        post(() -> {
+            Character sel = getSelectedCharacter();
+            if (sel != null && id.equals(sel.id)) {
+                displayedGlowMask = bmp;
+                displayedGlowConfig = cfg;
+                invalidate();
+            }
+        });
+    }
 
     public FavouritesLineupView(Context context) {
         this(context, null);
@@ -155,17 +332,19 @@ public class FavouritesLineupView extends View {
         cm.setSaturation(0f);
         bwFilter = new ColorMatrixColorFilter(cm);
 
+        Typeface mediumTypeface = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+
         textPaint.setColor(0xFFFFFFFF);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(36f);
-        textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        textPaint.setLetterSpacing(0.18f);
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(46f);
+        textPaint.setTypeface(mediumTypeface);
+        textPaint.setLetterSpacing(0.01f);
 
         headerPaint.setColor(0xB3FFFFFF);
         headerPaint.setTextAlign(Paint.Align.LEFT);
         headerPaint.setTextSize(26f);
-        headerPaint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-        headerPaint.setLetterSpacing(0.04f);
+        headerPaint.setTypeface(mediumTypeface);
+        headerPaint.setLetterSpacing(0.02f);
 
         sqHalo.setStyle(Paint.Style.STROKE);
         sqHalo.setStrokeCap(Paint.Cap.ROUND);
@@ -173,6 +352,8 @@ public class FavouritesLineupView extends View {
 
         Shader fadeShader = new LinearGradient(0, 840, 0, 1080, Color.TRANSPARENT, Color.BLACK, Shader.TileMode.CLAMP);
         fadePaint.setShader(fadeShader);
+
+        initGlowMasksBackground();
     }
 
     @Override
@@ -198,45 +379,85 @@ public class FavouritesLineupView extends View {
         return null;
     }
 
+    public int getSelectedRow() {
+        return selectedRow;
+    }
+
+    public int getSelectedCol() {
+        return selectedCol;
+    }
+
+    public void selectRightmost(int targetRow) {
+        if (targetRow == ROW_BACK) {
+            selectCharacter(ROW_BACK, backRow.length - 1);
+        } else {
+            selectCharacter(ROW_FRONT, frontRow.length - 1);
+        }
+    }
+
     public void selectNobody() {
         selectedRow = -1;
         selectedCol = -1;
         selectAnimStart = 0;
         prevTitle = null;
+        displayedGlowMask = null;
+        displayedGlowConfig = null;
         if (listener != null) listener.onNobodySelected();
         invalidate();
     }
 
     public void selectMiddleBackRow() {
-        selectCharacter(ROW_BACK, 1); // Walter White
+        selectMiddleBackRow(false);
+    }
+
+    public void selectMiddleBackRow(boolean force) {
+        selectCharacter(ROW_BACK, 1, force); // Walter White
     }
 
     public void selectCharacter(String id) {
         for (int i = 0; i < backRow.length; i++) {
             if (backRow[i].id.equals(id)) {
-                selectCharacter(ROW_BACK, i);
+                selectCharacter(ROW_BACK, i, false);
                 return;
             }
         }
         for (int i = 0; i < frontRow.length; i++) {
             if (frontRow[i].id.equals(id)) {
-                selectCharacter(ROW_FRONT, i);
+                selectCharacter(ROW_FRONT, i, false);
                 return;
             }
         }
     }
 
     public void selectCharacter(int row, int col) {
-        if (this.selectedRow == row && this.selectedCol == col) return;
-        // Capture previous title before overwriting
+        selectCharacter(row, col, false);
+    }
+
+    public void selectCharacter(int row, int col, boolean force) {
+        if (!force && this.selectedRow == row && this.selectedCol == col) return;
         Character previous = getSelectedCharacter();
-        prevTitle = (previous != null) ? previous.franchise.toUpperCase() : "MY FAVOURITES";
+        prevTitle = (previous != null) ? (previous.title != null ? previous.title : previous.franchise) : "My Favourites";
 
         this.selectedRow = row;
         this.selectedCol = col;
         selectAnimStart = SystemClock.uptimeMillis();
 
         Character selected = getSelectedCharacter();
+        if (selected != null) {
+            GlowConfig cfg = selected.glowConfig;
+            if (cfg != null) {
+                displayedGlowConfig = cfg;
+                Bitmap mask = glowMasks.get(selected.id);
+                if (mask != null) {
+                    displayedGlowMask = mask;
+                }
+                // If mask not yet finished generating on background thread, keep previous mask
+            }
+        } else {
+            displayedGlowMask = null;
+            displayedGlowConfig = null;
+        }
+
         if (listener != null && selected != null) {
             listener.onCharacterSelected(selected);
         }
@@ -337,48 +558,71 @@ public class FavouritesLineupView extends View {
 
         boolean isSpider = selected != null && "spider-man".equals(selected.id);
 
-        float settle = (selected != null) ? 0.96f + 0.04f * easeOut3(win(t, 0f, 0.75f)) : 1f;
-        canvas.save();
-        canvas.scale(settle, settle, 960f, 1080f);
-
         // Top-left persistent section header (matching reference design)
-        canvas.drawText("My Favourites", 72f, 68f, headerPaint);
+        canvas.drawText("My Favourites", 72f, 60f, headerPaint);
 
-        // 1. Draw rich atmospheric radial glow behind the selected character
-        if (selected != null) {
-            float glowAlpha = easeOut2(win(t, 0f, 0.40f));
-            int rgb = selected.color & 0x00FFFFFF;
-
-            int a0 = (int) (0xE8 * glowAlpha); // ~91% peak core
-            int a1 = (int) (0x9E * glowAlpha); // ~62% inner aura
-            int a2 = (int) (0x4E * glowAlpha); // ~31% mid spread
-            int a3 = (int) (0x16 * glowAlpha); // ~9% outer feather
-            int a4 = Color.TRANSPARENT;
-
-            int[] glowColors = new int[] { (a0 << 24) | rgb, (a1 << 24) | rgb, (a2 << 24) | rgb, (a3 << 24) | rgb, a4 };
-            float[] glowStops = new float[] { 0.0f, 0.22f, 0.48f, 0.74f, 1.0f };
-
-            // Center glow at upper torso / head
-            float glowY = selected.y + selected.height * 0.32f;
-            float glowRadius = 460f;
-
-            RadialGradient glow = new RadialGradient(selected.centerX, glowY, glowRadius,
-                    glowColors, glowStops, Shader.TileMode.CLAMP);
-            glowPaint.setShader(glow);
-            canvas.drawCircle(selected.centerX, glowY, glowRadius, glowPaint);
+        // 1. Draw active character glow behind that character, on the background layer, above background image, below cutouts and text
+        if (displayedGlowMask != null && displayedGlowConfig != null) {
+            int color = displayedGlowConfig.color & 0x00FFFFFF;
+            int alpha = (int) (255f * displayedGlowConfig.peakAlpha);
+            glowPaint.setColor((alpha << 24) | color);
+            glowPaint.setDither(true);
+            glowPaint.setFilterBitmap(true);
+            canvas.drawBitmap(displayedGlowMask, 0f, 0f, glowPaint);
         }
 
-        // 2. Draw Franchise name above the group --- TITLE CROSSFADE (Step 3c) ---
-        String title = (selected != null) ? selected.franchise.toUpperCase() : "MY FAVOURITES";
-        float p = win(t, 0f, 0.17f);
-        if (prevTitle != null && !prevTitle.equals(title) && p < 1f) {
-            textPaint.setAlpha((int) (255 * (1f - p)));
-            canvas.drawText(prevTitle, 960f, 85f, textPaint);
-            textPaint.setAlpha((int) (255 * p));
-            canvas.drawText(title, 960f, 85f, textPaint);
-            textPaint.setAlpha(255);
-        } else {
-            canvas.drawText(title, 960f, 85f, textPaint);
+        // 2. Draw Franchise/Movie Title & Streaming Service Logo above the selected character's area
+        if (selected != null) {
+            String title = selected.title != null ? selected.title : selected.franchise;
+            Bitmap logo = getLogo(selected.logoName);
+
+            float titleAlpha = easeOut2(win(t, 0f, 0.20f));
+            textPaint.setColor(0xFFFFFFFF);
+            textPaint.setAlpha((int) (255 * titleAlpha));
+            float textW = textPaint.measureText(title);
+
+            float logoW = 0f;
+            float logoH = 0f;
+            float logoGap = 16f;
+            if (logo != null && logo.getWidth() > 0 && logo.getHeight() > 0) {
+                logoH = 40f;
+                logoW = logo.getWidth() * (logoH / logo.getHeight());
+            }
+
+            float totalW = textW + (logo != null ? (logoGap + logoW) : 0f);
+
+            // Center title and logo compound block along the character's vertical head axis,
+            // while keeping safe margins inside TV boundaries (at least 80px from screen edges)
+            float charAxis = (selected.glowConfig != null) ? selected.glowConfig.getCenterX() : selected.centerX;
+            float startX = charAxis - totalW / 2f;
+            float minMargin = 80f;
+            float maxRight = 1920f - minMargin;
+            if (startX < minMargin) {
+                startX = minMargin;
+            } else if (startX + totalW > maxRight) {
+                startX = maxRight - totalW;
+            }
+
+            // Vertical placement tailored to available headroom:
+            // - Corner characters (Batman & John Wick in second row) have vast open headroom: titleY = 200f
+            // - Mid-flank characters with ample headroom (Tony Stark in second row, Saul Goodman in back row): titleY = 150f
+            // - Central & wide-spanning characters (Walter White hat apex ~y=178, Jack Sparrow & Spider-Man): titleY = 115f
+            float titleY = 115f;
+            if ("batman".equals(selected.id) || "john-wick".equals(selected.id)) {
+                titleY = 200f;
+            } else if ("tony-stark".equals(selected.id) || "saul-goodman".equals(selected.id)) {
+                titleY = 150f;
+            }
+            canvas.drawText(title, startX, titleY, textPaint);
+
+            if (logo != null) {
+                float lx = startX + textW + logoGap;
+                float ly = titleY - logoH * 0.88f;
+                dstLogoRect.set(lx, ly, lx + logoW, ly + logoH);
+                bitmapPaint.setAlpha((int) (255 * titleAlpha));
+                canvas.drawBitmap(logo, null, dstLogoRect, bitmapPaint);
+                bitmapPaint.setAlpha(255);
+            }
         }
 
         // 3. Draw Characters with correct Layering:
@@ -420,12 +664,10 @@ public class FavouritesLineupView extends View {
         // 5. Fade characters' legs into black at the bottom
         canvas.drawRect(0, 840, 1920, 1080, fadePaint);
 
-        canvas.restore(); // settle scale
-
         canvas.restore(); // 1920x1080 scale
 
         // --- KEEP DRAWING (Step 3d) ---
-        float animEnd = isSpider ? 1.45f : 0.80f;
+        float animEnd = isSpider ? 1.65f : 0.80f;
         if (selected != null && t < animEnd) {
             postInvalidateOnAnimation();
         }
@@ -462,11 +704,23 @@ public class FavouritesLineupView extends View {
         float oy = sm.y;
 
         for (float[] q : SQ) {
-            float grow   = easeOut2(win(t, q[5], q[6]));
-            float shrink = (float) Math.pow(win(t, q[7], q[8]), 1.3);
-            float vis    = grow * (1f - shrink);        // fraction drawn
-            if (vis < 0.02f) continue;
-            float alpha  = easeOut2(win(t, q[5], q[5] + 0.10f)) * (1f - shrink);
+            float inStart  = q[5];
+            float inEnd    = q[6];
+            float outStart = q[7];
+            float outEnd   = q[8];
+
+            float grow   = easeOut2(win(t, inStart, inEnd));
+            float shrink = easeOut2(win(t, outStart, outEnd));
+            if (grow <= 0.02f || shrink >= 0.98f) continue;
+
+            // Fade from inside (base u=0 near head) to outside (tip u=1)
+            float uStart = shrink;
+            float uEnd   = grow;
+            if (uEnd - uStart <= 0.03f) continue;
+
+            float alpha  = easeOut2(win(t, inStart, inStart + 0.10f)) * (1f - shrink);
+            if (alpha <= 0.01f) continue;
+
             float len    = q[2] * HEAD_W;
 
             // base from the UNSWAYED direction, then sway the direction
@@ -482,42 +736,36 @@ public class FavouritesLineupView extends View {
             float ny = dx;
             float amp = 0.20f * len;
             float phase = (float) (Math.PI * t) + q[9];
-            float wmax = 4.25f;
+
+            // Exit animation: thinned as shrink progresses
+            float wmax = 4.25f * (1f - 0.75f * shrink);
 
             int N = 28;
             sqPath.reset();
             for (int k = 0; k <= N; k++) {
-                float u = k / (float) N;
-                float f = u * vis;
+                float seg = k / (float) N;
+                float f = uStart + seg * (uEnd - uStart);
                 float wave = amp * (float) Math.sin(2 * Math.PI * q[4] * f - phase);
                 float px = bx + dx * f * len + nx * wave;
                 float py = by + dy * f * len + ny * wave;
-                float w = wmax * (float) Math.pow(Math.sin(Math.PI * u), 0.7);
+                float w = wmax * (float) Math.pow(Math.sin(Math.PI * seg), 0.7);
                 float lx = px + nx * w / 2f;
                 float ly = py + ny * w / 2f;
                 if (k == 0) sqPath.moveTo(lx, ly);
                 else sqPath.lineTo(lx, ly);
             }
             for (int k = N; k >= 0; k--) {
-                float u = k / (float) N;
-                float f = u * vis;
+                float seg = k / (float) N;
+                float f = uStart + seg * (uEnd - uStart);
                 float wave = amp * (float) Math.sin(2 * Math.PI * q[4] * f - phase);
                 float px = bx + dx * f * len + nx * wave;
                 float py = by + dy * f * len + ny * wave;
-                float w = wmax * (float) Math.pow(Math.sin(Math.PI * u), 0.7);
+                float w = wmax * (float) Math.pow(Math.sin(Math.PI * seg), 0.7);
                 sqPath.lineTo(px - nx * w / 2f, py - ny * w / 2f);
             }
             sqPath.close();
 
-            // Halo pass: width x2.2 effect via slightly larger path (18% of core alpha)
-            int haloAlpha = (int) (45.9f * alpha);
-            if (haloAlpha > 0) {
-                sqHalo.setColor(Color.argb(haloAlpha, 0xD9, 0xC8, 0xFF));
-                sqHalo.setStrokeWidth(wmax * 2.2f);
-                canvas.drawPath(sqPath, sqHalo);
-            }
-
-            // Core pass: solid white #FFFFFF
+            // Core pass (borderless)
             int coreAlpha = (int) (255 * alpha);
             sqFill.setColor(Color.argb(coreAlpha, 255, 255, 255));
             canvas.drawPath(sqPath, sqFill);
@@ -545,8 +793,10 @@ public class FavouritesLineupView extends View {
             int maxCol = (selectedRow == ROW_BACK) ? backRow.length - 1 : frontRow.length - 1;
             if (selectedCol < maxCol) {
                 selectCharacter(selectedRow, selectedCol + 1);
+            } else {
+                if (listener != null) listener.onNavigateRightToSecondPage(selectedRow);
             }
-            return true; // Stop at end
+            return true;
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {

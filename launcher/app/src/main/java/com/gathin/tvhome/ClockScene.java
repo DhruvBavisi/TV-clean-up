@@ -10,11 +10,13 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.io.File;
@@ -38,6 +40,7 @@ final class ClockScene {
     private final Random random = new Random();
     private final View content;
     private final View ambient;
+    private final ImageView dreamWallpaper;
     private final View timeRow;
     private final TextView dreamClock;
     private final TextView dreamDate;
@@ -67,12 +70,12 @@ final class ClockScene {
     ClockScene(View root) {
         content = root.findViewById(R.id.dreamContent);
         ambient = root.findViewById(R.id.dreamAmbient);
+        dreamWallpaper = root.findViewById(R.id.dreamWallpaper);
         timeRow = root.findViewById(R.id.dreamTimeRow);
         dreamClock = root.findViewById(R.id.dreamClock);
         dreamDate = root.findViewById(R.id.dreamDate);
         glow = new GradientDrawable();
         glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        ambient.setBackground(glow);
         ambient.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) ->
                 glow.setGradientRadius((r - l) * 0.55f));
         View.OnLayoutChangeListener layoutListener = (v, l, t, r, b, ol, ot, or, ob) -> adjustDateLetterSpacing();
@@ -80,7 +83,7 @@ final class ClockScene {
         if (dreamClock != null) dreamClock.addOnLayoutChangeListener(layoutListener);
         if (dreamDate != null) dreamDate.addOnLayoutChangeListener(layoutListener);
         colorIndex = random.nextInt(PALETTE.length);
-        setGlow(PALETTE[colorIndex]);
+        // Do not set ambient background here: wait for useHomeWallpaper() to check clock_wallpaper and clock_glow
     }
 
     private void adjustDateLetterSpacing() {
@@ -170,9 +173,14 @@ final class ClockScene {
             if (!cfg.clockGlow) {
                 wallpaperShown = true;   // also stops the glow's colour cycle
                 ambient.setBackground(null);
+            } else {
+                ambient.setBackground(glow);
+                setGlow(PALETTE[colorIndex]);
             }
             return;
         }
+        // clock_wallpaper is true: ensure ambient has NO coloured glow layer
+        ambient.setBackground(null);
         wallpaperFile = cfg.wallpaper != null ? cfg.wallpaper : cfg.wallpapers.isEmpty() ? null : cfg.wallpapers.get(0);
         if (wallpaperFile == null) {
             File direct = new File("/sdcard/wallpaper.png");
@@ -180,6 +188,9 @@ final class ClockScene {
         }
         wallpaperShade = (cfg.clockWallpaperDim * 255 / 100) << 24;
         wallpaperRes = ctx.getResources();
+        if (wallpaperFile != null && !wallpaperShown) {
+            loadWallpaper();
+        }
     }
 
     private void loadWallpaper() {
@@ -198,8 +209,14 @@ final class ClockScene {
                     return;
                 }
                 wallpaperShown = true;
-                ambient.setBackground(new LayerDrawable(new Drawable[]{
-                        new BitmapDrawable(res, bmp), new ColorDrawable(shade)}));
+                if (dreamWallpaper != null) {
+                    dreamWallpaper.setImageBitmap(bmp);
+                } else {
+                    ambient.setBackground(new LayerDrawable(new Drawable[]{
+                            new BitmapDrawable(res, bmp), new ColorDrawable(shade)}));
+                    return;
+                }
+                ambient.setBackgroundColor(shade);
             });
         }, "clock-wallpaper").start();
     }
@@ -223,6 +240,9 @@ final class ClockScene {
                 options.inTargetDensity = scale[1];
             }
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                options.inPreferredColorSpace = android.graphics.ColorSpace.get(android.graphics.ColorSpace.Named.SRGB);
+            }
             return BitmapFactory.decodeFile(file.getPath(), options);
         } catch (Exception | OutOfMemoryError failure) {
             return null;
@@ -246,7 +266,7 @@ final class ClockScene {
     }
 
     private void shiftGlow() {
-        if (wallpaperShown) return;
+        if (wallpaperShown || ambient.getBackground() != glow) return;
         int from = glowColor;
         colorIndex = (colorIndex + 1) % PALETTE.length;
         int to = PALETTE[colorIndex];

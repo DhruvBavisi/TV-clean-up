@@ -21,3 +21,26 @@ launcher/hs_err_pid*.log
 launcher/replay_pid*.log
 .agents/
 skills-lock.json
+
+# Local WIP PSDs and crops
+tv-assets/my-favourites-cartoon-updated
+tv-assets/reference/
+tv-assets/*crop*.png
+tv-assets/overlap_crop.png
+~$*
+
+# Scratch test and verification scripts
+tools/analyze_*
+tools/calc_*
+tools/capture_*
+tools/check_*
+tools/compare_*
+tools/crop_*
+tools/inspect_*
+tools/measure_*
+tools/rapid_test*
+tools/render_*
+tools/test_*
+tools/verify_*
+tools/deploy_and_test*
+
